@@ -13,6 +13,7 @@ To publish it as a web page, enable **GitHub Pages** for this repository (Settin
 | Tab | Purpose |
 |---|---|
 | Decision epoch | Set the 13 context inputs and see the human and machine strength scores, Δ, the admissible state set, the next state and the reason for it |
+| Strength landscape | Rotatable 3D surface of Δ over any two context inputs, coloured by the next state the selected rule chooses; forbidden regions are hatched and the current input is marked |
 | Rollout & log | Repeat the decision under a fixed context until the state is stable; step through epochs and copy the log as CSV; transition map of every state and Δ region |
 | Responsibility | Success and blame shares for human, machine and supervisor, with conservation check |
 | Scenario replay | The 100-scenario validation set, replayed live under any rule and threshold setting |
