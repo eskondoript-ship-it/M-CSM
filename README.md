@@ -20,6 +20,8 @@ To publish it as a web page, enable **GitHub Pages** for this repository (Settin
 | Responsibility drift | Perturbation test: silent machine accuracy drop or latency spike, with and without logged handovers |
 | Parameters & notes | All weights, thresholds and exponents, plus the model notes |
 
+The page has a 3D look: raised panels and keys, bevelled chart shapes, and charts that tilt with the mouse. The section tabs stay at the top while you scroll (on phones they form one row you can swipe).
+
 Four transition rules can be compared:
 
 - **Published**: the transition rule exactly as published; a result the constraints forbid is shown with a warning.
