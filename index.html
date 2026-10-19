@@ -164,10 +164,9 @@ input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;bor
   background:radial-gradient(circle at 35% 30%,#fff 0,color-mix(in srgb,var(--accent) 55%,#fff) 25%,var(--accent) 60%,color-mix(in srgb,var(--accent) 55%,#000) 100%);box-shadow:0 2px 4px var(--sh-lo)}
 .tablebox{border-radius:6px;box-shadow:inset 0 2px 6px var(--sh-lo2)}
 .algo{box-shadow:inset 0 2px 6px var(--sh-lo2)}
-.svgbox{perspective:1100px;padding:6px 2px 14px}
-.svgbox svg{transform:rotateX(var(--rx,9deg)) rotateY(var(--ry,0deg));transform-origin:50% 60%;transition:transform .35s ease;
+
+.svgbox svg{
   filter:drop-shadow(0 10px 8px var(--sh-lo2)) drop-shadow(0 2px 2px var(--sh-lo2))}
-.svgbox.tilting svg{transition:transform .06s linear}
 .svgbox svg rect:not([fill="none"]),.svgbox svg circle{filter:url(#mc-bevel)}
 #land{box-shadow:inset 0 2px 10px var(--sh-lo2)}
 
@@ -182,8 +181,9 @@ header.top .modebar{width:100%;min-width:0}
 
 /* ===== animation ===== */
 /* calm, flat instruments: Δ ruler, readouts and state graph do not tilt or animate */
-#ruler,#graph{transform:none!important;transition:none!important}
-.svgbox.draw #ruler *,.svgbox.draw #graph *{animation:none!important}
+.svgbox svg{transform:none!important;transition:none!important}
+.svgbox.draw svg *{animation:none!important}
+.svgbox{padding:0}
 .pane-in .readout{animation:none!important}
 
 html,body{overflow-x:clip}
@@ -469,7 +469,8 @@ nav.tabs button,.seg button,.btn{position:relative;overflow:hidden}
     <div class="panel">
       <h3>Responsibility drift: R<sub>H</sub> − ψ<sub>H</sub></h3>
       <div class="svgbox"><svg id="p-gap" viewBox="0 0 640 230" role="img" aria-label="Accountability gap over time"></svg></div>
-      <div class="legend"><span><span class="sw" style="background:var(--accent)"></span>logged handovers</span><span><span class="sw" style="background:var(--warn)"></span>no handover log</span><span><span class="sw" style="background:var(--line)"></span>perturbation window</span></div>
+      <div class="legend"><span><span class="sw" style="background:var(--accent)"></span>logged handovers</span><span><span class="sw" style="background:var(--warn)"></span>no handover log (dashed, drawn on top)</span><span><span class="sw" style="background:var(--line)"></span>perturbation window</span></div>
+      <p class="small muted">Where the dashed line runs along the solid one, both runs give the same gap; they separate only around a change of authority, where the unlogged record lags the actual regime.</p>
     </div>
     <div class="panel">
       <h3>Summary</h3>
@@ -885,7 +886,7 @@ function animatePane(pane){
   restart(pane,'pane-in'); clearTimeout(pane._a); pane._a=setTimeout(function(){ pane.classList.remove('pane-in'); },1600);
   drawCharts(pane);
 }
-function drawCharts(root){
+function drawCharts(root){ return; /* chart animations removed */
   Array.prototype.forEach.call(root.querySelectorAll('.svgbox'),function(b){ restart(b,'draw'); clearTimeout(b._d); b._d=setTimeout(function(){ b.classList.remove('draw'); },1400); });
 }
 function tweenNum(el,v,f){
@@ -934,13 +935,7 @@ document.querySelector('nav.tabs').addEventListener('keydown', function(e){
   var i=TABS.indexOf(S.tab); if (e.key==='ArrowRight') i=(i+1)%TABS.length; else if (e.key==='ArrowLeft') i=(i+TABS.length-1)%TABS.length; else return;
   e.preventDefault(); showTab(TABS[i]); $('tab-'+TABS[i]).focus();
 });
-/* 3D tilt for every chart: follows the mouse, settles back when it leaves */
-Array.prototype.forEach.call(document.querySelectorAll('.svgbox'), function(box){
-  box.addEventListener('pointermove', function(e){ if (e.pointerType!=='mouse' || box.querySelector('#ruler,#graph')) return; var r=box.getBoundingClientRect();
-    var px=(e.clientX-r.left)/r.width-0.5, py=(e.clientY-r.top)/r.height-0.5;
-    box.classList.add('tilting'); box.style.setProperty('--ry',(px*14).toFixed(2)+'deg'); box.style.setProperty('--rx',(9-py*12).toFixed(2)+'deg'); });
-  box.addEventListener('pointerleave', function(){ box.classList.remove('tilting'); box.style.removeProperty('--ry'); box.style.removeProperty('--rx'); });
-});
+
 
 /* ---------- mode ---------- */
 var MODE_NOTE = {
@@ -1333,11 +1328,11 @@ function renderP3(){
   for (var t2=0;t2<c.T;t2+=Math.max(1,Math.round(c.T/12))) el('text',{x:X(t2),y:gy1+16,'font-size':10.5,'text-anchor':'middle',class:'mt',fill:'var(--muted)'},g,String(t2));
   el('text',{x:gx1,y:gy1+30,'font-size':11,'text-anchor':'end',fill:'var(--muted)'},g,'epoch');
   el('text',{x:gx0+4,y:gy0+12,'font-size':11,fill:'var(--muted)'},g,'human answers for more than contributed ↑');
-  [[B,'var(--warn)','5 3'],[A,'var(--accent)','none']].forEach(function(z){
+  [[A,'var(--accent)','none',3.2,3],[B,'var(--warn)','6 4',2,2.2]].forEach(function(z){
     var d='', pen=false;
     z[0].rows.forEach(function(r){ if (isNaN(r.gap)){ pen=false; return; } d+=(pen?'L':'M')+X(r.t).toFixed(1)+' '+Y(r.gap).toFixed(1)+' '; pen=true; });
-    if (d) el('path',{d:d,fill:'none',stroke:z[1],'stroke-width':2.2,'stroke-dasharray':z[2]},g);
-    z[0].rows.forEach(function(r){ if (!isNaN(r.gap)) el('circle',{cx:X(r.t),cy:Y(r.gap),r:2.4,fill:z[1]},g); });
+    if (d) el('path',{d:d,fill:'none',stroke:z[1],'stroke-width':z[3],'stroke-dasharray':z[2],'stroke-linecap':'round'},g);
+    z[0].rows.forEach(function(r){ if (!isNaN(r.gap)) el('circle',{cx:X(r.t),cy:Y(r.gap),r:z[4],fill:z[1]},g); });
   });
   // KPIs
   function mean(rows,a,b){ var s=0,n=0; rows.forEach(function(r){ if (r.t>=a&&r.t<b&&!isNaN(r.gap)){ s+=r.gap; n++; } }); return n? s/n : NaN; }
