@@ -1,0 +1,1281 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>M-CSM Simulator</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&display=swap">
+<style>
+/* Layout: control-room instrument — inputs rail on the left, live readouts on the right, tabs for the four instruments. */
+:root{
+  --bg:#f3f4f2; --panel:#fbfbfa; --ink:#1d2329; --muted:#5b6670; --line:#d5d9d6; --line-strong:#aab1ad;
+  --accent:#1f5f6b; --accent-soft:#dbe9ea; --warn:#a4471d; --warn-soft:#f6e4d9; --ok:#2f6f4a;
+  --st-H:#b06d1f; --st-Hs:#e9cfa8; --st-M:#33669a; --st-Ms:#c4d6ea; --st-HM:#2c8572; --st-N:#776c8c; --st-Ns:#ddd8e6;
+  --display:"Source Serif 4", Georgia, "Times New Roman", serif;
+  --body:"IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono:"IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#151a1e; --panel:#1c2227; --ink:#e4e8e6; --muted:#9aa6ad; --line:#2f383e; --line-strong:#4a555c;
+  --accent:#6fb7c2; --accent-soft:#1f3539; --warn:#ef9a6c; --warn-soft:#3a2519; --ok:#7fc99a;
+  --st-H:#e0a057; --st-Hs:#5a4223; --st-M:#78a6d6; --st-Ms:#2a3e55; --st-HM:#5cc0a8; --st-N:#a99cc4; --st-Ns:#3a3449;
+  color-scheme:dark }}
+:root[data-theme="dark"]{
+  --bg:#151a1e; --panel:#1c2227; --ink:#e4e8e6; --muted:#9aa6ad; --line:#2f383e; --line-strong:#4a555c;
+  --accent:#6fb7c2; --accent-soft:#1f3539; --warn:#ef9a6c; --warn-soft:#3a2519; --ok:#7fc99a;
+  --st-H:#e0a057; --st-Hs:#5a4223; --st-M:#78a6d6; --st-Ms:#2a3e55; --st-HM:#5cc0a8; --st-N:#a99cc4; --st-Ns:#3a3449;
+  color-scheme:dark }
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:14px;line-height:1.5;
+  padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));padding-block:20px 48px}
+.wrap{max-width:1240px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+h1{font-family:var(--display);font-weight:600;font-size:28px;line-height:1.15;margin:0;text-wrap:balance;letter-spacing:-.01em}
+h2{font-family:var(--display);font-weight:600;font-size:18px;margin:0;text-wrap:balance}
+h3{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:0}
+p{margin:0}
+sub{font-size:.72em;line-height:0}
+.mono,.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+.small{font-size:12.5px}
+header.top{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:12px 24px;border-bottom:1px solid var(--line-strong);padding-bottom:14px}
+header.top .lede{max-width:64ch;color:var(--muted);margin-top:6px}
+.modebar{display:flex;flex-direction:column;gap:6px;align-items:flex-start}
+.seg{display:inline-flex;border:1px solid var(--line-strong);border-radius:6px;overflow:hidden;flex-wrap:wrap}
+.seg button{font:inherit;font-size:12.5px;padding:6px 10px;background:var(--panel);color:var(--ink);border:0;border-right:1px solid var(--line);cursor:pointer}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--panel)}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+nav.tabs{display:flex;gap:2px;flex-wrap:wrap;border-bottom:1px solid var(--line)}
+nav.tabs button{font:inherit;font-weight:500;padding:8px 14px;border:0;background:transparent;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
+nav.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+.btn{font:inherit;font-size:13px;font-weight:500;padding:6px 12px;border-radius:6px;border:1px solid var(--line-strong);background:var(--panel);color:var(--ink);cursor:pointer}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--panel)}
+select{max-width:100%}
+select,input[type=number]{font:inherit;font-size:13px;background:var(--panel);color:var(--ink);border:1px solid var(--line-strong);border-radius:5px;padding:4px 6px}
+input[type=number]{font-family:var(--mono);width:5.2em}
+.grid{display:grid;grid-template-columns:minmax(0,340px) minmax(0,1fr);gap:20px;align-items:start}
+@media (max-width:860px){.grid{grid-template-columns:minmax(0,1fr)}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px 16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.rail{display:flex;flex-direction:column;gap:14px;min-width:0}
+.group{display:flex;flex-direction:column;gap:6px}
+.srow{display:grid;grid-template-columns:5.6em minmax(0,1fr) 3.4em;gap:8px;align-items:center}
+.srow label{font-family:var(--mono);font-size:13px}
+.srow .desc{grid-column:1 / -1;margin-top:-6px;font-size:11.5px;color:var(--muted)}
+.srow output{font-family:var(--mono);font-size:13px;text-align:right;font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;accent-color:var(--accent);margin:0}
+.toggles{display:flex;gap:16px;flex-wrap:wrap}
+.toggles label{display:flex;gap:6px;align-items:center;font-family:var(--mono);font-size:13px;cursor:pointer}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.readouts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.readout{display:flex;flex-direction:column;gap:2px}
+.readout .v{font-family:var(--mono);font-size:24px;font-weight:500;font-variant-numeric:tabular-nums}
+.verdict{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;padding:12px 14px;border-radius:8px;border:1px solid var(--line)}
+.verdict .state{font-family:var(--display);font-size:22px;font-weight:600}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-family:var(--mono);padding:2px 8px;border-radius:999px;border:1px solid var(--line-strong);white-space:nowrap}
+.pill.bad{border-color:var(--warn);color:var(--warn);background:var(--warn-soft)}
+.pill.good{border-color:var(--ok);color:var(--ok)}
+.alert{border-left:3px solid var(--warn);background:var(--warn-soft);padding:8px 12px;border-radius:0 6px 6px 0;font-size:13px}
+.alert[hidden]{display:none!important}
+.chips{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+@media (max-width:520px){.chips{grid-template-columns:repeat(2,minmax(0,1fr))}.readouts{grid-template-columns:repeat(3,minmax(0,1fr))}.readout .v{font-size:19px}}
+.chip{border:1px solid var(--line);border-radius:6px;padding:6px 8px;font-size:12px;display:flex;flex-direction:column;gap:1px;min-width:0}
+.chip b{font-family:var(--mono);font-weight:500;font-size:12.5px}
+.chip.out{opacity:.62;border-style:dashed}
+.chip.out b{text-decoration:line-through}
+.chip .why{color:var(--warn);font-family:var(--mono);font-size:11px}
+.algo{font-family:var(--mono);font-size:12px;line-height:1.65;margin:0;padding:8px 0;border:1px solid var(--line);border-radius:6px;overflow-x:auto;background:var(--bg)}
+.algo div{padding:0 10px;white-space:pre}
+.algo div.hit{background:var(--accent-soft);box-shadow:inset 3px 0 0 var(--accent)}
+.algo div.hit.bad{background:var(--warn-soft);box-shadow:inset 3px 0 0 var(--warn)}
+.algo span.ln{color:var(--muted);display:inline-block;width:2.2em}
+.svgbox{overflow-x:auto}
+svg{display:block;max-width:100%;height:auto}
+svg text{font-family:var(--body);fill:var(--ink)}
+svg .mt{font-family:var(--mono)}
+.twocol{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}
+@media (max-width:860px){.twocol{grid-template-columns:minmax(0,1fr)}}
+table{border-collapse:collapse;width:100%;font-size:12.5px}
+th,td{text-align:left;padding:5px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600}
+#tmapTable th,#rollTable th,#logTable th,#respTable th,#p-table th{text-transform:none;letter-spacing:.02em;font-size:12px}
+td.n{font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right}
+th.n{text-align:right}
+.tablebox{overflow-x:auto;max-width:100%}
+.sw{display:inline-block;width:10px;height:10px;border-radius:2px;vertical-align:-1px;margin-right:6px}
+textarea{width:100%;min-height:120px;font-family:var(--mono);font-size:11.5px;background:var(--bg);color:var(--ink);border:1px solid var(--line-strong);border-radius:6px;padding:8px}
+details summary{cursor:pointer;font-weight:500}
+.notes{display:flex;flex-direction:column;gap:10px;max-width:78ch}
+.notes li{margin-bottom:6px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--muted)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.kpi{border:1px solid var(--line);border-radius:6px;padding:8px 10px;display:flex;flex-direction:column;gap:2px}
+.kpi .v{font-family:var(--mono);font-size:18px;font-variant-numeric:tabular-nums}
+.ptab{display:grid;grid-template-columns:1.6em repeat(5,minmax(0,1fr));gap:6px 6px;align-items:center}
+.ptab input{width:100%;padding:4px 4px;-moz-appearance:textfield;appearance:textfield}
+.ptab input::-webkit-outer-spin-button,.ptab input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.ptab .h{font-size:13px;font-family:var(--mono);color:var(--muted);font-weight:500;text-align:center}
+#graph{min-width:520px}
+#ruler{min-width:500px}
+#p-strip,#p-gap{min-width:520px}
+.pgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px 14px}
+.pgrid label{display:flex;justify-content:space-between;gap:8px;align-items:center;font-family:var(--mono);font-size:13px}
+footer{color:var(--muted);font-size:12px;border-top:1px solid var(--line);padding-top:12px}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="top">
+  <div>
+    <h1>M-CSM Simulator</h1>
+  </div>
+  <div class="modebar">
+    <h3>Transition policy</h3>
+    <p class="small muted">Choose which transition rule the simulator applies.</p>
+    <div class="seg" role="group" aria-label="Transition policy" id="modeSeg">
+      <button type="button" data-mode="literal" aria-pressed="true">Published</button>
+      <button type="button" data-mode="enforced" aria-pressed="false">Human fallback</button>
+      <button type="button" data-mode="eq8" aria-pressed="false">Compact</button>
+      <button type="button" data-mode="revised" aria-pressed="false">Admissibility-preserving</button>
+    </div>
+    <label class="small row" id="dbRow" hidden style="gap:6px">When no rule applies <select id="deadBandSel" aria-label="When no allocation rule applies"><option value="negotiate">go to S_N</option><option value="hold">hold the current stable state</option></select></label>
+    <p class="small muted" id="modeNote"></p>
+  </div>
+</header>
+
+<nav class="tabs" role="tablist" aria-label="Instruments">
+  <button role="tab" id="tab-epoch" aria-selected="true" aria-controls="pane-epoch">Decision epoch</button>
+  <button role="tab" id="tab-roll" aria-selected="false" aria-controls="pane-roll">Rollout &amp; log</button>
+  <button role="tab" id="tab-resp" aria-selected="false" aria-controls="pane-resp">Responsibility</button>
+  <button role="tab" id="tab-scen" aria-selected="false" aria-controls="pane-scen">Scenario replay</button>
+  <button role="tab" id="tab-p3" aria-selected="false" aria-controls="pane-p3">Responsibility drift</button>
+  <button role="tab" id="tab-par" aria-selected="false" aria-controls="pane-par">Parameters &amp; notes</button>
+</nav>
+
+<!-- ============ DECISION EPOCH ============ -->
+<section id="pane-epoch" role="tabpanel" aria-labelledby="tab-epoch">
+<div class="grid">
+  <aside class="rail">
+    <div class="panel">
+      <div class="group">
+        <h3>Example context</h3>
+        <select id="exampleSel" aria-label="Example context"></select>
+        <p class="small muted" id="exampleNote"></p>
+      </div>
+      <div class="group">
+        <h3>Current state q<sub>t</sub></h3>
+        <select id="qSel" aria-label="Current state"></select>
+      </div>
+    </div>
+    <div class="panel"><h3>Human agent H</h3><div class="group" id="g-H"></div></div>
+    <div class="panel"><h3>Machine agent M</h3><div class="group" id="g-M"></div></div>
+    <div class="panel"><h3>Joint and governance signals</h3><div class="group" id="g-G"></div>
+      <div class="toggles">
+        <label><input type="checkbox" id="in-FC"> FC = 1 <span class="muted small">fairness-critical</span></label>
+        <label><input type="checkbox" id="in-HO"> HO = 1 <span class="muted small">human override</span></label>
+      </div>
+    </div>
+  </aside>
+
+  <div class="rail">
+    <div class="panel">
+      <div class="readouts">
+        <div class="readout"><h3>S<sub>H</sub> human strength</h3><span class="v" id="o-SH"></span></div>
+        <div class="readout"><h3>S<sub>M</sub> machine strength</h3><span class="v" id="o-SM"></span></div>
+        <div class="readout"><h3>Δ = S<sub>M</sub> − S<sub>H</sub></h3><span class="v" id="o-D"></span></div>
+      </div>
+      <div class="svgbox"><svg id="ruler" viewBox="0 0 600 92" role="img" aria-label="Position of Δ against the decision thresholds"></svg></div>
+    </div>
+
+    <div class="verdict" id="verdict">
+      <div><h3>Next state q<sub>t+1</sub></h3><div class="state" id="o-next"></div></div>
+      <div class="row" id="o-tags"></div>
+    </div>
+    <div class="alert" id="o-alert" hidden></div>
+
+    <div class="panel">
+      <div class="row" style="justify-content:space-between"><h3>State-transition graph</h3>
+        <span class="legend"><span><span class="sw" style="border:1.5px dashed var(--ink)"></span>current q<sub>t</sub></span><span><span class="sw" style="background:var(--accent)"></span>selected q<sub>t+1</sub></span><span>struck out = inadmissible</span><span>grey arrows = every transition the selected policy can make</span></span></div>
+      <div class="svgbox"><svg id="graph" viewBox="0 0 600 310" role="img" aria-label="M-CSM state graph"></svg></div>
+    </div>
+
+    <div class="panel">
+      <h3>Admissible set A(x<sub>t</sub>) — constraints (4)–(7)</h3>
+      <div class="chips" id="chips"></div>
+    </div>
+
+    <div class="panel">
+      <h3 id="algoTitle">Published rule — line that fired</h3>
+      <div class="algo" id="algo"></div>
+    </div>
+
+    <div class="panel">
+      <div class="row" style="justify-content:space-between"><h3>Sensitivity screen (one at a time)</h3><span class="small muted">thresholds ±20 %, weights ±20 % renormalised, inputs ±0.05</span></div>
+      <p id="sensSummary"></p>
+      <div class="tablebox"><table id="sensTable"></table></div>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ============ ROLLOUT ============ -->
+<section id="pane-roll" role="tabpanel" aria-labelledby="tab-roll" hidden>
+<div class="rail">
+  <div class="panel">
+    <h2>Stabilised rollout under the current context</h2>
+    <p class="muted small">Repeats the decision epoch with the context from the Decision epoch tab held fixed, starting from q<sub>t</sub>, until the state stops changing. This is the procedure behind the paper's “stabilized rollout” counts.</p>
+    <div class="row"><span class="small">Start from</span><b class="mono" id="rollStart"></b><span class="small muted">·</span><span class="small" id="rollResult"></span></div>
+    <div class="tablebox"><table id="rollTable"></table></div>
+  </div>
+  <div class="panel">
+    <h2>Transition map</h2>
+    <p class="muted small">Next state for every current state and every region of Δ, using the governance signals (HO, ER, FC, VA<sub>HM</sub>, TC) and thresholds currently set. Shaded cells are results that A(x<sub>t</sub>) excludes.</p>
+    <div class="tablebox"><table id="tmapTable"></table></div>
+    <p class="small" id="tmapNote"></p>
+  </div>
+  <div class="panel">
+    <div class="row" style="justify-content:space-between">
+      <h2>Epoch log</h2>
+      <div class="row">
+        <button class="btn primary" id="stepBtn" type="button">Step one epoch</button>
+        <button class="btn" id="clearLog" type="button">Clear log</button>
+        <button class="btn" id="copyCsv" type="button">Copy CSV</button>
+      </div>
+    </div>
+    <p class="muted small">Each step applies the epoch to the current context, records it, and moves q<sub>t</sub> to the result. Change inputs between steps to trace a scenario as it evolves. The log is the accountability trace the paper describes.</p>
+    <div class="tablebox"><table id="logTable"></table></div>
+    <details><summary class="small">Show CSV text</summary><textarea id="csvBox" readonly aria-label="CSV export"></textarea></details>
+    <p class="small" id="copyMsg" aria-live="polite"></p>
+  </div>
+</div>
+</section>
+
+<!-- ============ RESPONSIBILITY ============ -->
+<section id="pane-resp" role="tabpanel" aria-labelledby="tab-resp" hidden>
+<div class="grid">
+  <aside class="rail">
+    <div class="panel">
+      <div class="group">
+        <h3>Regime</h3>
+        <select id="respState" aria-label="Regime for responsibility presets"></select>
+        <label class="small"><input type="checkbox" id="respFollow" checked> Follow q<sub>t+1</sub> from the decision epoch</label>
+      </div>
+      <div class="srow"><label for="in-y">y<sub>t</sub></label><input type="range" id="in-y" min="0" max="1" step="0.01"><output id="out-y"></output>
+        <span class="desc">assessed success of the joint outcome</span></div>
+      <button class="btn" type="button" id="respReset">Reload preset for this regime</button>
+      <p class="small muted" id="respNote">The paper gives no default values for χ, a, k, f or d. These presets are illustrative placeholders; replace them with your own.</p>
+    </div>
+    <div class="panel">
+      <h3>Contributions and normative factors</h3>
+      <p class="small muted">χ contribution · a authority · k knowledge · f freedom · d duty. Rows: H human, M machine, G supervisor.</p>
+      <div class="ptab" id="respInputs"></div>
+    </div>
+  </aside>
+  <div class="rail">
+    <div class="panel">
+      <h3>Conserved responsibility R<sub>i</sub> = r<sub>i</sub><sup>+</sup> + r<sub>i</sub><sup>−</sup></h3>
+      <div class="svgbox"><svg id="respChart" viewBox="0 0 600 170" role="img" aria-label="Responsibility shares"></svg></div>
+      <div class="legend"><span><span class="sw" style="background:var(--accent)"></span>r<sup>+</sup> success share</span><span><span class="sw" style="background:var(--warn)"></span>r<sup>−</sup> blame share</span><span><span class="sw" style="border:1px solid var(--muted)"></span>ψ functional share (outline)</span></div>
+    </div>
+    <div class="panel">
+      <div class="tablebox"><table id="respTable"></table></div>
+      <p class="small" id="respCheck"></p>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ============ SCENARIO REPLAY ============ -->
+<section id="pane-scen" role="tabpanel" aria-labelledby="tab-scen" hidden>
+<div class="rail">
+  <div class="panel">
+    <div class="row" style="justify-content:space-between;align-items:flex-end">
+      <div><h2>100-scenario validation, replayed</h2>
+      <p class="muted small" style="max-width:78ch">Inputs come from <span class="mono">scenario_analysis_support.py</span>, which turns each scenario's text into the 13 model inputs with keyword rules and family profiles. Each case starts in S<sub>H</sub> and is repeated for up to four epochs under a fixed context, as in the notebook. Counts update with the policy mode and the thresholds on the Parameters tab.</p></div>
+      <span class="pill" id="sc-match"></span>
+    </div>
+    <div class="kpis" id="sc-kpis"></div>
+    <p class="small" id="sc-constraints"></p>
+  </div>
+  <div class="panel">
+    <div class="row">
+      <label class="small" for="sc-fam">Family</label><select id="sc-fam"></select>
+      <label class="small" for="sc-state">Stable state</label><select id="sc-state"></select>
+      <span class="small muted" id="sc-shown"></span>
+    </div>
+    <div class="tablebox" style="max-height:640px;overflow:auto"><table id="sc-table"></table></div>
+  </div>
+</div>
+</section>
+
+<!-- ============ P3 LAB ============ -->
+<section id="pane-p3" role="tabpanel" aria-labelledby="tab-p3" hidden>
+<div class="grid">
+  <aside class="rail">
+    <div class="panel">
+      <h2>Responsibility drift</h2>
+      <p class="small">Arrangements tuned for capability but weak on tracing should show <i>responsibility drift</i> under perturbation: the gap between what the human is held answerable for and what the human actually contributed widens. This is Proposition P3 of the scoping review, which proposes testing it with and without logged reallocation events.</p>
+      <div class="group">
+        <h3>Perturbation</h3>
+        <select id="p-kind" aria-label="Perturbation type">
+          <option value="silent">Silent accuracy drop (machine)</option>
+          <option value="latency">Latency spike (time pressure)</option>
+        </select>
+      </div>
+      <div class="group" id="p-sliders"></div>
+      <div class="group">
+        <h3>Start state</h3>
+        <select id="p-q0" aria-label="Start state"></select>
+      </div>
+      <div class="row">
+        <button class="btn" type="button" id="p-loadEx">Load example context</button>
+      </div>
+      <p class="small muted">The baseline context is the one set on the Decision epoch tab, and responsibility uses the regime presets from the Responsibility tab, including any edits you make there.</p>
+    </div>
+  </aside>
+  <div class="rail">
+    <div class="panel">
+      <h3>Authority regime per epoch</h3>
+      <div class="svgbox"><svg id="p-strip" viewBox="0 0 640 120" role="img" aria-label="Regime timelines"></svg></div>
+      <div class="legend" id="p-legend"></div>
+    </div>
+    <div class="panel">
+      <h3>Responsibility drift: R<sub>H</sub> − ψ<sub>H</sub></h3>
+      <div class="svgbox"><svg id="p-gap" viewBox="0 0 640 230" role="img" aria-label="Accountability gap over time"></svg></div>
+      <div class="legend"><span><span class="sw" style="background:var(--accent)"></span>logged handovers</span><span><span class="sw" style="background:var(--warn)"></span>no handover log</span><span><span class="sw" style="background:var(--line)"></span>perturbation window</span></div>
+    </div>
+    <div class="panel">
+      <h3>Summary</h3>
+      <div class="kpis" id="p-kpis"></div>
+      <p class="small" id="p-read"></p>
+    </div>
+    <div class="panel">
+      <details><summary class="small">Epoch table</summary><div class="tablebox"><table id="p-table"></table></div></details>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ============ PARAMETERS ============ -->
+<section id="pane-par" role="tabpanel" aria-labelledby="tab-par" hidden>
+<div class="rail">
+  <div class="panel">
+    <div class="row" style="justify-content:space-between"><h2>Parameters</h2><button class="btn" type="button" id="parReset">Restore paper defaults</button></div>
+    <div class="group"><h3>Strength weights w<sup>H</sup> (CP, TR, VA, 1−UC)</h3><div class="pgrid" id="par-wH"></div></div>
+    <div class="group"><h3>Strength weights w<sup>M</sup> (CP, TR, VA, 1−UC)</h3><div class="pgrid" id="par-wM"></div></div>
+    <p class="small" id="wNote"></p>
+    <div class="group"><h3>Thresholds</h3><div class="pgrid" id="par-th"></div></div>
+    <div class="group"><h3>Responsibility exponents</h3><div class="pgrid" id="par-ex"></div></div>
+  </div>
+  <div class="panel notes">
+    <h2>What this simulator implements, and what it adds</h2>
+    <p><b>From the paper.</b> Context vector (1); strength score (2) as a weighted geometric mean with 0<sup>0</sup> = 1; Δ (3); admissibility constraints (4)–(7); the compact rule; the published transition rule line by line; responsibility (9)–(12) with the ψ fallback for a zero denominator; reference weights, thresholds and exponents.</p>
+    <p><b>Policy modes.</b> The paper's compact rule and its published rule differ, and the published rule can return a state its own constraints exclude:</p>
+    <ul>
+      <li>Line 6 returns S<sub>H→M</sub> without checking (7), so a time-critical case with a machine advantage enters an excluded handover state.</li>
+      <li>Line 16 returns S<sub>N</sub> without checking (7), so a time-critical, ambiguous case enters excluded negotiation.</li>
+      <li>Line 3 forces S<sub>H</sub> under override even though (4) also admits S<sub>HM</sub> and S<sub>M→H</sub>.</li>
+      <li>The compact rule jumps straight to S<sub>M</sub> and is stateless; the published rule depends on q<sub>t</sub> and passes through the handover states.</li>
+    </ul>
+    <p><b>Behaviour of the published rule that the simulator exposes</b> (see the transition map on the Rollout tab):</p>
+    <ul>
+      <li>S<sub>N</sub> is nearly absorbing. From negotiation, a clear human advantage (Δ ≤ −θ<sub>H</sub>) or machine advantage (Δ ≥ θ<sub>M</sub>) leaves the state at S<sub>N</sub>; only |Δ| &lt; ε (to S<sub>HM</sub>) or line 3 (to S<sub>H</sub>) leaves it. “Recovery” has no rule of its own.</li>
+      <li>S<sub>HM</sub> has no direct exit to S<sub>H</sub> or S<sub>M</sub>: any clear advantage sends it to S<sub>N</sub>, where it then stays.</li>
+      <li>An interrupted handover does not reverse: S<sub>H→M</sub> with a human advantage, and S<sub>M→H</sub> with a machine advantage, both go to S<sub>N</sub>.</li>
+      <li>On 200,000 random contexts, the published rule returned an excluded state in 8.2 % of cases (compact rule: 3.1 %), and the two policies disagreed in 25.3 %.</li>
+    </ul>
+    <p><b>Admissibility-preserving rule.</b> A proposed correction that keeps the paper's states, inputs, constraints and thresholds, and changes only the transition rule:</p>
+    <ul>
+      <li>Every branch checks A(x<sub>t</sub>), so the result is always admissible (0 violations in 400,000 random contexts).</li>
+      <li>A clear machine advantage (Δ ≥ θ<sub>M</sub>) starts a handover from any non-machine state, including S<sub>HM</sub> and S<sub>N</sub>; a clear human advantage (Δ ≤ −θ<sub>H</sub>) returns any non-machine state to S<sub>H</sub>. Negotiation and shared control can therefore always be left.</li>
+      <li>An interrupted transfer reverses: S<sub>H→M</sub> with a human advantage returns to S<sub>H</sub>; S<sub>M→H</sub> with a machine advantage returns to S<sub>M</sub>.</li>
+      <li>When TC ≥ κ excludes the handover states, a transfer is made directly (lines 8 and 11) instead of entering an excluded state.</li>
+      <li>An override, ethical-risk or fairness trigger in machine-led control passes through the logged return S<sub>M→H</sub> when it is admissible, so the most safety-relevant transfer is also visible.</li>
+      <li>When no allocation rule applies, the paper's choice (S<sub>N</sub>) is kept by default. The alternative “hold” keeps a stable state instead, which treats the gap between ε and θ as a hysteresis band.</li>
+    </ul>
+    <p>On the 100 scenarios, the admissibility-preserving rule with the default setting gives the paper's 26 / 45 / 28 / 1 exactly, because every case starts in S<sub>H</sub> and none reaches a changed branch. With “hold”, the 28 negotiation cases become human-led (54 / 45 / 0 / 1).</p>
+    <p>“Human fallback” keeps the published rule but replaces any excluded result with S<sub>H</sub>, which (4)–(7) never exclude. It is one possible repair, not the paper's rule.</p>
+    <p><b>Added for the Responsibility and Responsibility drift tabs (not in the paper).</b></p>
+    <ul>
+      <li>Regime presets for χ, a, k, f and d. The paper reports machine responsibility of 23.3 %, which requires d<sub>M</sub> &gt; 0 and f<sub>M</sub> &gt; 0, so the presets keep both small but non-zero.</li>
+      <li>Responsibility drift outcome model: y<sub>t</sub> = ψ<sub>H</sub>·CP<sub>H</sub> + ψ<sub>M</sub>·CP<sub>M</sub><sup>true</sup> + ψ<sub>G</sub>·mean(CP<sub>H</sub>, CP<sub>M</sub><sup>true</sup>).</li>
+      <li>Silent drop: true machine capability falls at the onset; the model's observed CP<sub>M</sub> follows only after the detection lag.</li>
+      <li>Latency spike: TC is raised for the window and the human's capability falls by the stated loss, both visible to the model.</li>
+      <li>Without a handover log, transfers skip S<sub>H→M</sub> and S<sub>M→H</sub>, and the accountability record (normative factors) lags the actual regime by one epoch, while functional shares follow the actual regime.</li>
+    </ul>
+    <p><b>Scenario validation.</b> The Scenario replay tab runs the 100 cases from <span class="mono">scenario_analysis_support.py</span>. With paper defaults it matches the notebook in all 100 one-step and stable states, and in strengths and responsibility shares to within 10<sup>−10</sup>. Three properties of that mapping matter for the paper:</p>
+    <ul>
+      <li>Responsibility inputs are built from family profiles and keywords only, never from the selected state, so in the validation responsibility is not coupled to the authority regime.</li>
+      <li>By construction TC cannot exceed 0.50 (κ = 0.80), ER reaches at most 0.545 in the corpus (ρ = 0.70), and VA<sub>HM</sub> never falls below τ, so constraints (5, ethical-risk part), (6) and (7) are never exercised.</li>
+      <li>16 of the 26 human-led outcomes come from line 3, triggered by the keyword flags HO (“override”, “veto”, …) and FC (“bias”, “neighborhood”, …); only 10 come from a human strength advantage.</li>
+    </ul>
+  </div>
+</div>
+</section>
+
+</div>
+
+<script>
+/* M-CSM reference engine — implements eqs. (2)–(12) and Algorithm 1 of
+   "M-CSM: A Governance-Oriented Complementary Strength Model for Hybrid
+   Human–Machine Decision-Making". Pure functions, no DOM. */
+var MCSM = (function () {
+  'use strict';
+
+  var STATES = ['S_H', 'S_HtoM', 'S_M', 'S_MtoH', 'S_HM', 'S_N'];
+  var STATE_LABEL = {
+    S_H: 'Human-led', S_HtoM: 'Handover request (H→M)', S_M: 'Machine-led',
+    S_MtoH: 'Return request (M→H)', S_HM: 'Shared control', S_N: 'Negotiation / recovery'
+  };
+  // Who holds authority in each state (used for transfer counting)
+  var HOLDER = { S_H: 'H', S_HtoM: 'H', S_M: 'M', S_MtoH: 'M', S_HM: 'HM', S_N: 'N' };
+
+  var DEFAULT_PARAMS = {
+    wH: [0.35, 0.20, 0.25, 0.20],
+    wM: [0.40, 0.20, 0.20, 0.20],
+    thetaM: 0.12, thetaH: 0.10, eps: 0.05, rho: 0.70, tau: 0.60, kappa: 0.80, deadBand: 'negotiate',
+    alpha: [1, 1, 1],            // (αa, αk, αd)
+    beta: [1.3, 1.2, 0.8, 1.1]   // (βa, βk, βf, βd)
+  };
+
+  function clip01(v) { return Math.max(0, Math.min(1, v)); }
+  // x^w with the convention 0^0 = 1
+  function pw(x, w) { return (w === 0) ? 1 : Math.pow(x, w); }
+
+  // Eq. (2): weighted geometric strength score
+  function strength(cp, tr, va, uc, w) {
+    return pw(cp, w[0]) * pw(tr, w[1]) * pw(va, w[2]) * pw(1 - uc, w[3]);
+  }
+
+  function normWeights(w) {
+    var s = w.reduce(function (a, b) { return a + b; }, 0);
+    return s > 0 ? w.map(function (v) { return v / s; }) : [0.25, 0.25, 0.25, 0.25];
+  }
+
+  // Eqs. (4)–(7): admissible set with the constraint that removed each state
+  function admissible(x, p) {
+    var excluded = {}; // state -> [constraint labels]
+    function ex(s, why) { (excluded[s] = excluded[s] || []).push(why); }
+    if (x.HO === 1) {
+      ['S_HtoM', 'S_M', 'S_N'].forEach(function (s) { ex(s, '(4) HO = 1'); });
+    }
+    if (x.ER >= p.rho || x.FC === 1) {
+      ex('S_M', x.FC === 1 && x.ER >= p.rho ? '(5) ER ≥ ρ and FC = 1' : (x.FC === 1 ? '(5) FC = 1' : '(5) ER ≥ ρ'));
+    }
+    if (x.VA_HM < p.tau) ex('S_HM', '(6) VA_HM < τ');
+    if (x.TC >= p.kappa) {
+      ['S_N', 'S_HtoM', 'S_MtoH'].forEach(function (s) { ex(s, '(7) TC ≥ κ'); });
+    }
+    var set = STATES.filter(function (s) { return !excluded[s]; });
+    return { set: set, excluded: excluded, has: function (s) { return set.indexOf(s) >= 0; } };
+  }
+
+  function scores(x, p) {
+    var SH = strength(x.CP_H, x.TR_H, x.VA_H, x.UC_H, p.wH);
+    var SM = strength(x.CP_M, x.TR_M, x.VA_M, x.UC_M, p.wM);
+    return { SH: SH, SM: SM, delta: SM - SH };
+  }
+
+  function decide(q, d, x, p, mode, opts) {
+    opts = opts || {};
+    var A = admissible(x, p), next, line;
+    if (mode === 'eq8') {
+      if (x.HO === 1 || x.ER >= p.rho || x.FC === 1) { next = 'S_H'; line = 'eq8:1'; }
+      else if (d >= p.thetaM && A.has('S_M')) { next = 'S_M'; line = 'eq8:2'; }
+      else if (Math.abs(d) < p.eps && x.VA_HM >= p.tau && A.has('S_HM')) { next = 'S_HM'; line = 'eq8:3'; }
+      else if (d <= -p.thetaH) { next = 'S_H'; line = 'eq8:4'; }
+      else { next = 'S_N'; line = 'eq8:5'; }
+    } else if (mode === 'revised') {
+      /* Algorithm 2: admissibility-preserving transition policy (mode 'revised').
+         Every branch checks A(x_t), so the result is always admissible.
+         p.deadBand: 'negotiate' (go to S_N) or 'hold' (keep a stable state). */
+      var HtoM = opts.collapse ? 'S_M' : 'S_HtoM', MtoH = opts.collapse ? 'S_H' : 'S_MtoH';
+      if (x.HO === 1 || x.ER >= p.rho || x.FC === 1) {
+        if (q === 'S_M' && !opts.collapse && A.has('S_MtoH')) { next = 'S_MtoH'; line = 4; } else { next = 'S_H'; line = 4; }
+      } else if (d >= p.thetaM && A.has('S_M')) {
+        if (q === 'S_M' || q === 'S_HtoM' || q === 'S_MtoH') { next = 'S_M'; line = 6; }
+        else if (A.has(HtoM)) { next = HtoM; line = 7; }
+        else { next = 'S_M'; line = 8; }
+      } else if (d <= -p.thetaH) {
+        if (q === 'S_M' && A.has(MtoH)) { next = MtoH; line = 10; } else { next = 'S_H'; line = 11; }
+      } else if (Math.abs(d) < p.eps && x.VA_HM >= p.tau && A.has('S_HM')) { next = 'S_HM'; line = 13; }
+      else {
+        var stable = (q === 'S_H' || q === 'S_M' || q === 'S_HM') && A.has(q);
+        if ((p.deadBand || 'negotiate') === 'negotiate') {
+          if (A.has('S_N')) { next = 'S_N'; line = 15; } else { next = stable ? q : 'S_H'; line = 15; }
+        } else {
+          if (stable) { next = q; line = 16; }
+          else if (q === 'S_N' && A.has('S_N')) { next = 'S_N'; line = 16; }
+          else { next = 'S_H'; line = 16; }
+        }
+      }
+    } else {
+      if (x.HO === 1 || x.ER >= p.rho || x.FC === 1) { next = 'S_H'; line = 3; }
+      else if (q === 'S_H' && d >= p.thetaM && A.has('S_M')) { next = opts.collapse ? 'S_M' : 'S_HtoM'; line = 5; }
+      else if ((q === 'S_M' || q === 'S_HtoM') && d >= p.thetaM && A.has('S_M')) { next = 'S_M'; line = 7; }
+      else if (q === 'S_M' && d <= -p.thetaH) { next = opts.collapse ? 'S_H' : 'S_MtoH'; line = 9; }
+      else if ((q === 'S_H' || q === 'S_MtoH') && d <= -p.thetaH) { next = 'S_H'; line = 11; }
+      else if (Math.abs(d) < p.eps && x.VA_HM >= p.tau && A.has('S_HM')) { next = 'S_HM'; line = 13; }
+      else { next = 'S_N'; line = 15; }
+    }
+    var violation = !A.has(next), fallback = false;
+    if (violation && mode === 'enforced') { next = 'S_H'; fallback = true; }
+    var gov = line === 3 || line === 4 || line === 'eq8:1';
+    return { q: q, next: next, line: line, delta: d, A: A, violation: violation, fallback: fallback, gov: gov };
+  }
+
+  /* One decision epoch.
+     mode: 'literal'  – Published: Algorithm 1 exactly as printed
+           'enforced' – Human fallback: an inadmissible result becomes S_H
+           'eq8'      – Compact (eq. 8): the stateless summary policy
+     opts.collapse: true skips the logged handover states (S_H→M, S_M→H) */
+  function step(q, x, p, mode, opts) {
+    var sc = scores(x, p);
+    var r = decide(q, sc.delta, x, p, mode, opts);
+    r.SH = sc.SH; r.SM = sc.SM;
+    return r;
+  }
+
+  /* Next state for every (q_t, region of Δ) under the governance signals of x. */
+  function transitionMap(x, p, mode) {
+    var regions = [];
+    regions.push({ key: 'hadv', label: 'Δ ≤ −θH', d: -p.thetaH - 0.05 });
+    if (p.thetaH > p.eps) regions.push({ key: 'deadm', label: '−θH < Δ ≤ −ε', d: -(p.thetaH + p.eps) / 2 });
+    regions.push({ key: 'shared', label: '|Δ| < ε', d: 0 });
+    if (p.thetaM > p.eps) regions.push({ key: 'deadp', label: 'ε ≤ Δ < θM', d: (p.thetaM + p.eps) / 2 });
+    regions.push({ key: 'madv', label: 'Δ ≥ θM', d: p.thetaM + 0.05 });
+    var rows = STATES.map(function (q) {
+      return { q: q, cells: regions.map(function (r) { return decide(q, r.d, x, p, mode); }) };
+    });
+    return { regions: regions, rows: rows };
+  }
+
+  // Repeat the epoch under a fixed context until the state stops changing
+  function rollout(q0, x, p, mode, maxEpochs, opts) {
+    var trace = [], q = q0, seen = {};
+    maxEpochs = maxEpochs || 20;
+    for (var t = 0; t < maxEpochs; t++) {
+      var r = step(q, x, p, mode, opts);
+      r.t = t;
+      trace.push(r);
+      if (r.next === q) return { trace: trace, final: q, stable: true, cycle: false };
+      var key = q + '>' + r.next;
+      if (seen[key]) return { trace: trace, final: r.next, stable: false, cycle: true };
+      seen[key] = true;
+      q = r.next;
+    }
+    return { trace: trace, final: q, stable: false, cycle: false };
+  }
+
+  /* Eqs. (9)–(12). parties: {H:{chi,a,k,f,d}, M:{...}, G:{...}}, y in [0,1] */
+  function responsibility(parties, y, p) {
+    var ids = ['H', 'M', 'G'];
+    var chiSum = ids.reduce(function (s, i) { return s + parties[i].chi; }, 0);
+    var out = { ok: chiSum > 0, rows: {} };
+    if (!out.ok) return out;
+    var al = p.alpha, be = p.beta;
+    ids.forEach(function (i) {
+      var P = parties[i];
+      var psi = P.chi / chiSum;
+      var gp = pw(P.a, al[0]) * pw(P.k, al[1]) * pw(P.d, al[2]);
+      var gm = pw(P.a, be[0]) * pw(P.k, be[1]) * pw(P.f, be[2]) * pw(P.d, be[3]);
+      out.rows[i] = { psi: psi, gp: gp, gm: gm };
+    });
+    var sp = 0, sm = 0;
+    ids.forEach(function (i) { sp += out.rows[i].psi * out.rows[i].gp; sm += out.rows[i].psi * out.rows[i].gm; });
+    out.fallbackPlus = sp === 0; out.fallbackMinus = sm === 0;
+    var total = 0;
+    ids.forEach(function (i) {
+      var r = out.rows[i];
+      r.rp = y * (sp > 0 ? r.psi * r.gp / sp : r.psi);
+      r.rm = (1 - y) * (sm > 0 ? r.psi * r.gm / sm : r.psi);
+      r.R = r.rp + r.rm;
+      total += r.R;
+    });
+    out.total = total;
+    return out;
+  }
+
+  /* Illustrative responsibility presets per regime. NOT from the paper:
+     the paper gives no defaults for χ, a, k, f, d. Edit freely. */
+  var RESP_PRESETS = {
+    S_H:    { H: { chi: .70, a: 1.0, k: .80, f: .90, d: 1.0 }, M: { chi: .20, a: .10, k: .70, f: .20, d: .20 }, G: { chi: .10, a: .60, k: .60, f: .70, d: .80 } },
+    S_HtoM: { H: { chi: .50, a: .80, k: .75, f: .80, d: .95 }, M: { chi: .40, a: .40, k: .80, f: .30, d: .25 }, G: { chi: .10, a: .60, k: .60, f: .70, d: .80 } },
+    S_M:    { H: { chi: .15, a: .30, k: .60, f: .50, d: .80 }, M: { chi: .75, a: .90, k: .90, f: .50, d: .40 }, G: { chi: .10, a: .60, k: .60, f: .70, d: .80 } },
+    S_MtoH: { H: { chi: .40, a: .60, k: .70, f: .60, d: .90 }, M: { chi: .50, a: .60, k: .85, f: .40, d: .30 }, G: { chi: .10, a: .60, k: .60, f: .70, d: .80 } },
+    S_HM:   { H: { chi: .45, a: .60, k: .70, f: .70, d: .90 }, M: { chi: .45, a: .50, k: .80, f: .40, d: .30 }, G: { chi: .10, a: .60, k: .60, f: .70, d: .80 } },
+    S_N:    { H: { chi: .40, a: .50, k: .65, f: .60, d: .90 }, M: { chi: .30, a: .30, k: .75, f: .30, d: .25 }, G: { chi: .30, a: .80, k: .60, f: .80, d: .90 } }
+  };
+
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+
+  /* One-at-a-time sensitivity screen around the current context
+     (thresholds ±20 %, each weight ±20 % then renormalised, continuous inputs ±0.05). */
+  var CONT_INPUTS = ['CP_H', 'TR_H', 'VA_H', 'UC_H', 'CP_M', 'TR_M', 'VA_M', 'UC_M', 'VA_HM', 'ER', 'TC'];
+  function sensitivity(q, x, p, mode) {
+    var base = step(q, x, p, mode).next, flips = [], n = 0;
+    function test(label, x2, p2) {
+      n++;
+      var s = step(q, x2, p2, mode).next;
+      if (s !== base) flips.push({ label: label, to: s });
+    }
+    ['thetaM', 'thetaH', 'eps', 'rho', 'tau', 'kappa'].forEach(function (k) {
+      [-0.2, 0.2].forEach(function (f) { var p2 = clone(p); p2[k] = p[k] * (1 + f); test(k + (f > 0 ? ' +20%' : ' −20%'), x, p2); });
+    });
+    ['wH', 'wM'].forEach(function (w) {
+      for (var i = 0; i < 4; i++) {
+        [-0.2, 0.2].forEach(function (f) {
+          var p2 = clone(p); p2[w][i] = p[w][i] * (1 + f); p2[w] = normWeights(p2[w]);
+          test(w + '[' + (i + 1) + ']' + (f > 0 ? ' +20%' : ' −20%'), x, p2);
+        });
+      }
+    });
+    CONT_INPUTS.forEach(function (k) {
+      [-0.05, 0.05].forEach(function (f) { var x2 = clone(x); x2[k] = clip01(x[k] + f); test(k + (f > 0 ? ' +0.05' : ' −0.05'), x2, p); });
+    });
+    return { base: base, n: n, flips: flips };
+  }
+
+  /* P3 perturbation run (assumptions beyond the paper are documented in the UI).
+     cfg: {x0, p, mode, q0, T, kind:'latency'|'silent', onset, duration, magnitude,
+           humanLoss, lag, traced, presets} */
+  function perturbRun(cfg) {
+    var p = cfg.p, x0 = cfg.x0, rows = [], q = cfg.q0, recorded = cfg.q0;
+    var transfers = 0, untraced = 0, violations = 0, zeroStates = {};
+    for (var t = 0; t < cfg.T; t++) {
+      var x = clone(x0);
+      var trueCPM = x0.CP_M, trueCPH = x0.CP_H;
+      var active = t >= cfg.onset && t < cfg.onset + cfg.duration;
+      if (cfg.kind === 'latency' && active) {
+        x.TC = clip01(cfg.magnitude);
+        trueCPH = clip01(x0.CP_H - cfg.humanLoss);
+        x.CP_H = trueCPH; // time pressure is visible to the model
+      }
+      if (cfg.kind === 'silent' && t >= cfg.onset) {
+        trueCPM = clip01(x0.CP_M - cfg.magnitude);
+        if (t >= cfg.onset + cfg.lag) x.CP_M = trueCPM; // detected after lag
+      }
+      var r = step(q, x, p, cfg.mode, { collapse: !cfg.traced });
+      if (r.violation) violations++;
+      var prevHolder = HOLDER[q], nextHolder = HOLDER[r.next];
+      if (prevHolder !== nextHolder) {
+        transfers++;
+        if (!cfg.traced && ((prevHolder === 'H' && nextHolder === 'M') || (prevHolder === 'M' && nextHolder === 'H'))) untraced++;
+      }
+      // Actual regime drives functional contribution; the accountability record
+      // uses the last logged regime. Untraced runs log one epoch late.
+      var actual = cfg.presets[r.next];
+      var recState = cfg.traced ? r.next : recorded;
+      var rec = cfg.presets[recState];
+      var parties = {
+        H: Object.assign({}, rec.H, { chi: actual.H.chi }),
+        M: Object.assign({}, rec.M, { chi: actual.M.chi }),
+        G: Object.assign({}, rec.G, { chi: actual.G.chi })
+      };
+      var chiSum = actual.H.chi + actual.M.chi + actual.G.chi;
+      var zeroChi = !(chiSum > 0);
+      var psiH = zeroChi ? NaN : actual.H.chi / chiSum, psiM = zeroChi ? NaN : actual.M.chi / chiSum, psiG = zeroChi ? NaN : actual.G.chi / chiSum;
+      var y = zeroChi ? NaN : clip01(psiH * trueCPH + psiM * trueCPM + psiG * (trueCPH + trueCPM) / 2);
+      var resp = zeroChi ? null : responsibility(parties, y, p);
+      if (zeroChi) zeroStates[r.next] = 1;
+      rows.push({
+        t: t, q: q, next: r.next, recorded: recState, line: r.line, delta: r.delta, SH: r.SH, SM: r.SM,
+        TC: x.TC, CPMobs: x.CP_M, CPMtrue: trueCPM, y: y, active: cfg.kind === 'latency' ? active : t >= cfg.onset,
+        violation: r.violation, psiH: psiH, RH: resp ? resp.rows.H.R : NaN, RM: resp ? resp.rows.M.R : NaN, RG: resp ? resp.rows.G.R : NaN,
+        gap: resp ? resp.rows.H.R - psiH : NaN
+      });
+      recorded = r.next;
+      q = r.next;
+    }
+    return { rows: rows, transfers: transfers, untraced: untraced, violations: violations, zeroChi: Object.keys(zeroStates) };
+  }
+
+  return {
+    STATES: STATES, STATE_LABEL: STATE_LABEL, HOLDER: HOLDER, DEFAULT_PARAMS: DEFAULT_PARAMS,
+    RESP_PRESETS: RESP_PRESETS, CONT_INPUTS: CONT_INPUTS,
+    strength: strength, scores: scores, admissible: admissible, step: step, decide: decide, transitionMap: transitionMap, rollout: rollout,
+    responsibility: responsibility, sensitivity: sensitivity, perturbRun: perturbRun,
+    normWeights: normWeights, clone: clone, clip01: clip01
+  };
+})();
+if (typeof module !== 'undefined') module.exports = MCSM;
+
+var SCEN_FAMILIES={"A": "Driver and Vehicle Navigation System", "B": "Human Operator and AI Technical Debugging Assistant", "C": "Clinician and Diagnostic AI System", "D": "Loan Officer and Credit Assessment AI", "E": "Production Supervisor and Industrial AI Control System", "F": "Teacher and AI Tutoring System", "G": "Legal Researcher and Legal AI Assistant", "H": "Cybersecurity Analyst and Threat Detection AI", "I": "Supply Chain Manager and Logistics AI", "J": "Hiring Manager and Recruitment AI", "K": "Disaster Response Commander and Situational AI", "L": "Older Adult and Smart Home Care AI", "M": "Farmer and Precision Agriculture AI", "N": "Urban Planner and Mobility Planning AI", "O": "Creative Director and Generative Design AI", "P": "Journalist and Verification AI", "Q": "Scientific Researcher and Literature-Synthesis AI", "R": "Financial Analyst and Portfolio Recommendation AI", "S": "Environmental Regulator and Monitoring AI", "T": "Customer Service Manager and Conversational AI System"};
+var SCENARIOS=[{"id":1,"f":"A","t":"Unknown destination","x":{"CP_H":0.525,"CP_M":0.678,"TR_H":0.81,"TR_M":0.7618,"VA_H":0.845,"VA_M":0.7784,"VA_HM":0.8175,"UC_H":0.484,"UC_M":0.34,"ER":0.155,"TC":0.19,"FC":0,"HO":0},"P":{"H":{"chi":0.855,"a":0.655,"k":0.675,"f":0.82,"d":0.78},"M":{"chi":0.75,"a":0.6952,"k":0.7911,"f":0.28,"d":0.66},"G":{"chi":0.2475,"a":0.27,"k":0.4775,"f":0.735,"d":0.67}},"y":0.57698,"o1":"S_N","os":"S_N"},{"id":2,"f":"A","t":"Unknown selected path","x":{"CP_H":0.5825,"CP_M":0.733,"TR_H":0.8112,"TR_M":0.765,"VA_H":0.8459,"VA_M":0.78,"VA_HM":0.8175,"UC_H":0.445,"UC_M":0.285,"ER":0.155,"TC":0.19,"FC":0,"HO":0},"P":{"H":{"chi":0.875,"a":0.705,"k":0.725,"f":0.82,"d":0.78},"M":{"chi":0.855,"a":0.7,"k":0.7975,"f":0.28,"d":0.66},"G":{"chi":0.2475,"a":0.27,"k":0.4775,"f":0.735,"d":0.67}},"y":0.71796,"o1":"S_N","os":"S_N"},{"id":3,"f":"A","t":"Known destination but unknown path","x":{"CP_H":0.57,"CP_M":0.748,"TR_H":0.8112,"TR_M":0.765,"VA_H":0.8459,"VA_M":0.78,"VA_HM":0.8175,"UC_H":0.4435,"UC_M":0.285,"ER":0.155,"TC":0.19,"FC":0,"HO":0},"P":{"H":{"chi":0.845,"a":0.705,"k":0.725,"f":0.82,"d":0.78},"M":{"chi":0.88,"a":0.7,"k":0.7975,"f":0.28,"d":0.66},"G":{"chi":0.2475,"a":0.27,"k":0.4775,"f":0.735,"d":0.67}},"y":0.71836,"o1":"S_N","os":"S_N"},{"id":4,"f":"A","t":"Known destination and known path","x":{"CP_H":0.6375,"CP_M":0.763,"TR_H":0.8112,"TR_M":0.765,"VA_H":0.8459,"VA_M":0.78,"VA_HM":0.8175,"UC_H":0.3835,"UC_M":0.255,"ER":0.155,"TC":0.19,"FC":0,"HO":0},"P":{"H":{"chi":0.84,"a":0.705,"k":0.775,"f":0.82,"d":0.78},"M":{"chi":0.905,"a":0.7,"k":0.8,"f":0.28,"d":0.66},"G":{"chi":0.2475,"a":0.27,"k":0.4775,"f":0.735,"d":0.67}},"y":0.77562,"o1":"S_HM","os":"S_HM"},{"id":5,"f":"A","t":"Requested autopilot for navigation","x":{"CP_H":0.595,"CP_M":0.838,"TR_H":0.81,"TR_M":0.85325,"VA_H":0.845,"VA_M":0.78,"VA_HM":0.7825,"UC_H":0.385,"UC_M":0.255,"ER":0.155,"TC":0.19,"FC":0,"HO":0},"P":{"H":{"chi":0.76,"a":0.655,"k":0.725,"f":0.82,"d":0.78},"M":{"chi":0.99,"a":0.76,"k":0.8,"f":0.28,"d":0.66},"G":{"chi":0.2475,"a":0.27,"k":0.4775,"f":0.735,"d":0.67}},"y":0.74104,"o1":"S_N","os":"S_N"},{"id":6,"f":"B","t":"Human cannot locate the debugging point","x":{"CP_H":0.565,"CP_M":0.724,"TR_H":0.81,"TR_M":0.765,"VA_H":0.845,"VA_M":0.78,"VA_HM":0.8175,"UC_H":0.434,"UC_M":0.3,"ER":0.21,"TC":0.135,"FC":0,"HO":0},"P":{"H":{"chi":0.855,"a":0.715,"k":0.675,"f":0.86,"d":0.82},"M":{"chi":0.83,"a":0.59,"k":0.7975,"f":0.23,"d":0.59},"G":{"chi":0.2925,"a":0.3,"k":0.49,"f":0.735,"d":0.69}},"y":0.67152,"o1":"S_N","os":"S_N"},{"id":7,"f":"B","t":"Human can ask for debugging but lacks technical detail","x":{"CP_H":0.5125,"CP_M":0.7315,"TR_H":0.81,"TR_M":0.765,"VA_H":0.845,"VA_M":0.78,"VA_HM":0.8175,"UC_H":0.4565,"UC_M":0.315,"ER":0.21,"TC":0.135,"FC":0,"HO":0},"P":{"H":{"chi":0.825,"a":0.715,"k":0.675,"f":0.86,"d":0.82},"M":{"chi":0.855,"a":0.59,"k":0.7975,"f":0.23,"d":0.59},"G":{"chi":0.2925,"a":0.3,"k":0.49,"f":0.735,"d":0.69}},"y":0.66327,"o1":"S_N","os":"S_N"},{"id":8,"f":"B","t":"Hallucinated and untested AI result","x":{"CP_H":0.62,"CP_M":0.659,"TR_H":0.81,"TR_M":0.7586,"VA_H":0.845,"VA_M":0.7768,"VA_HM":0.8175,"UC_H":0.365,"UC_M":0.35,"ER":0.21,"TC":0.135,"FC":0,"HO":0},"P":{"H":{"chi":0.82,"a":0.715,"k":0.725,"f":0.86,"d":0.82},"M":{"chi":0.8,"a":0.5852,"k":0.7936,"f":0.23,"d":0.59},"G":{"chi":0.2925,"a":0.3,"k":0.49,"f":0.735,"d":0.69}},"y":0.63195,"o1":"S_HM","os":"S_HM"},{"id":9,"f":"B","t":"Human knows the task but cannot evaluate the result","x":{"CP_H":0.5575,"CP_M":0.7065,"TR_H":0.8112,"TR_M":0.7618,"VA_H":0.8459,"VA_M":0.7784,"VA_HM":0.8175,"UC_H":0.4235,"UC_M":0.34,"ER":0.21,"TC":0.135,"FC":0,"HO":0},"P":{"H":{"chi":0.815,"a":0.765,"k":0.725,"f":0.86,"d":0.82},"M":{"chi":0.825,"a":0.5852,"k":0.7911,"f":0.23,"d":0.59},"G":{"chi":0.2925,"a":0.3,"k":0.49,"f":0.735,"d":0.69}},"y":0.69592,"o1":"S_HM","os":"S_HM"},{"id":10,"f":"B","t":"Qualified human facing a known error","x":{"CP_H":0.655,"CP_M":0.754,"TR_H":0.8124,"TR_M":0.765,"VA_H":0.8468,"VA_M":0.78,"VA_HM":0.8175,"UC_H":0.362,"UC_M":0.27,"ER":0.21,"TC":0.135,"FC":0,"HO":0},"P":{"H":{"chi":0.81,"a":0.765,"k":0.775,"f":0.86,"d":0.82},"M":{"chi":0.93,"a":0.59,"k":0.8,"f":0.23,"d":0.59},"G":{"chi":0.2925,"a":0.3,"k":0.49,"f":0.735,"d":0.69}},"y":0.77391,"o1":"S_HM","os":"S_HM"},{"id":11,"f":"C","t":"Vague symptoms and uncertain diagnosis","x":{"CP_H":0.64,"CP_M":0.657,"TR_H":0.88,"TR_M":0.69,"VA_H":0.92,"VA_M":0.7,"VA_HM":0.8175,"UC_H":0.429,"UC_M":0.375,"ER":0.5,"TC":0.245,"FC":0,"HO":0},"P":{"H":{"chi":0.925,"a":0.79,"k":0.73,"f":0.88,"d":0.96},"M":{"chi":0.76,"a":0.5,"k":0.7425,"f":0.205,"d":0.54},"G":{"chi":0.57,"a":0.54,"k":0.65,"f":0.78,"d":0.88}},"y":0.61555,"o1":"S_N","os":"S_N"},{"id":12,"f":"C","t":"Known likely diagnosis but unknown treatment interaction","x":{"CP_H":0.6975,"CP_M":0.66075,"TR_H":0.8812,"TR_M":0.68825,"VA_H":0.9209,"VA_M":0.7,"VA_HM":0.7825,"UC_H":0.39,"UC_M":0.36,"ER":0.5,"TC":0.245,"FC":0,"HO":0},"P":{"H":{"chi":0.945,"a":0.84,"k":0.78,"f":0.88,"d":0.96},"M":{"chi":0.785,"a":0.5,"k":0.7425,"f":0.205,"d":0.54},"G":{"chi":0.57,"a":0.54,"k":0.65,"f":0.78,"d":0.88}},"y":0.66283,"o1":"S_N","os":"S_N"},{"id":13,"f":"C","t":"High AI confidence with incomplete patient data","x":{"CP_H":0.615,"CP_M":0.6245,"TR_H":0.88,"TR_M":0.6868,"VA_H":0.92,"VA_M":0.6984,"VA_HM":0.8175,"UC_H":0.42,"UC_M":0.415,"ER":0.47,"TC":0.245,"FC":0,"HO":1},"P":{"H":{"chi":0.865,"a":0.87,"k":0.73,"f":0.96,"d":0.96},"M":{"chi":0.73,"a":0.4872,"k":0.7361,"f":0.205,"d":0.54},"G":{"chi":0.578,"a":0.62,"k":0.65,"f":0.78,"d":0.88}},"y":0.53066,"o1":"S_H","os":"S_H"},{"id":14,"f":"C","t":"Emergency triage under severe time pressure","x":{"CP_H":0.6425,"CP_M":0.66825,"TR_H":0.88,"TR_M":0.69,"VA_H":0.92,"VA_M":0.7,"VA_HM":0.8175,"UC_H":0.39,"UC_M":0.36,"ER":0.5,"TC":0.445,"FC":0,"HO":0},"P":{"H":{"chi":0.835,"a":0.79,"k":0.73,"f":0.88,"d":0.96},"M":{"chi":0.835,"a":0.5,"k":0.7425,"f":0.205,"d":0.54},"G":{"chi":0.57,"a":0.54,"k":0.65,"f":0.78,"d":0.88}},"y":0.60632,"o1":"S_N","os":"S_N"},{"id":15,"f":"C","t":"Contextual factor outside the model","x":{"CP_H":0.73,"CP_M":0.672,"TR_H":0.8824,"TR_M":0.69,"VA_H":0.9218,"VA_M":0.7,"VA_HM":0.8175,"UC_H":0.357,"UC_M":0.345,"ER":0.47,"TC":0.245,"FC":0,"HO":1},"P":{"H":{"chi":0.88,"a":0.92,"k":0.83,"f":0.96,"d":0.96},"M":{"chi":0.86,"a":0.492,"k":0.745,"f":0.205,"d":0.54},"G":{"chi":0.578,"a":0.62,"k":0.65,"f":0.78,"d":0.88}},"y":0.72063,"o1":"S_H","os":"S_H"},{"id":16,"f":"D","t":"Applicant with unconventional financial profile","x":{"CP_H":0.69,"CP_M":0.664,"TR_H":0.8562,"TR_M":0.69,"VA_H":0.9209,"VA_M":0.6975,"VA_HM":0.815,"UC_H":0.3725,"UC_M":0.33,"ER":0.5,"TC":0.135,"FC":1,"HO":0},"P":{"H":{"chi":0.93,"a":0.825,"k":0.775,"f":0.86,"d":0.92},"M":{"chi":0.76,"a":0.5502,"k":0.745,"f":0.23,"d":0.575},"G":{"chi":0.5298,"a":0.51,"k":0.6375,"f":0.78,"d":0.86}},"y":0.66812,"o1":"S_H","os":"S_H"},{"id":17,"f":"D","t":"AI recommendation without explainability","x":{"CP_H":0.5675,"CP_M":0.6315,"TR_H":0.855,"TR_M":0.6868,"VA_H":0.92,"VA_M":0.6984,"VA_HM":0.8175,"UC_H":0.4265,"UC_M":0.4,"ER":0.415,"TC":0.135,"FC":0,"HO":0},"P":{"H":{"chi":0.825,"a":0.715,"k":0.675,"f":0.86,"d":0.92},"M":{"chi":0.705,"a":0.5502,"k":0.7361,"f":0.23,"d":0.575},"G":{"chi":0.525,"a":0.51,"k":0.6375,"f":0.78,"d":0.86}},"y":0.54209,"o1":"S_HM","os":"S_HM"},{"id":18,"f":"D","t":"Conflict between interview evidence and model score","x":{"CP_H":0.595,"CP_M":0.679,"TR_H":0.855,"TR_M":0.6865,"VA_H":0.92,"VA_M":0.7,"VA_HM":0.7475,"UC_H":0.395,"UC_M":0.345,"ER":0.385,"TC":0.135,"FC":0,"HO":0},"P":{"H":{"chi":0.795,"a":0.715,"k":0.675,"f":0.86,"d":0.92},"M":{"chi":0.81,"a":0.555,"k":0.7425,"f":0.23,"d":0.575},"G":{"chi":0.525,"a":0.51,"k":0.6375,"f":0.78,"d":0.86}},"y":0.63401,"o1":"S_HM","os":"S_HM"},{"id":19,"f":"D","t":"Potential fairness concern","x":{"CP_H":0.6525,"CP_M":0.6865,"TR_H":0.8562,"TR_M":0.68825,"VA_H":0.9209,"VA_M":0.69,"VA_HM":0.7725,"UC_H":0.3635,"UC_M":0.33,"ER":0.545,"TC":0.135,"FC":1,"HO":0},"P":{"H":{"chi":0.84,"a":0.825,"k":0.775,"f":0.86,"d":0.92},"M":{"chi":0.835,"a":0.5502,"k":0.745,"f":0.23,"d":0.575},"G":{"chi":0.5298,"a":0.51,"k":0.6375,"f":0.78,"d":0.86}},"y":0.65598,"o1":"S_H","os":"S_H"},{"id":20,"f":"D","t":"Policy exception with documented override","x":{"CP_H":0.64,"CP_M":0.694,"TR_H":0.8562,"TR_M":0.69,"VA_H":0.9209,"VA_M":0.7,"VA_HM":0.8175,"UC_H":0.3635,"UC_M":0.33,"ER":0.385,"TC":0.135,"FC":0,"HO":1},"P":{"H":{"chi":0.81,"a":0.845,"k":0.775,"f":0.94,"d":0.92},"M":{"chi":0.86,"a":0.547,"k":0.745,"f":0.23,"d":0.575},"G":{"chi":0.533,"a":0.59,"k":0.6375,"f":0.78,"d":0.86}},"y":0.80342,"o1":"S_H","os":"S_H"},{"id":21,"f":"E","t":"Predicted machine failure with uncertain severity","x":{"CP_H":0.58,"CP_M":0.661,"TR_H":0.855,"TR_M":0.69,"VA_H":0.92,"VA_M":0.7,"VA_HM":0.8175,"UC_H":0.474,"UC_M":0.375,"ER":0.5,"TC":0.295,"FC":0,"HO":0},"P":{"H":{"chi":0.855,"a":0.685,"k":0.675,"f":0.84,"d":0.96},"M":{"chi":0.76,"a":0.61,"k":0.7425,"f":0.255,"d":0.61},"G":{"chi":0.57,"a":0.54,"k":0.65,"f":0.78,"d":0.88}},"y":0.59957,"o1":"S_HM","os":"S_HM"},{"id":22,"f":"E","t":"Experienced supervisor versus anomaly alert","x":{"CP_H":0.7075,"CP_M":0.67225,"TR_H":0.8574,"TR_M":0.68825,"VA_H":0.9218,"VA_M":0.7,"VA_HM":0.7825,"UC_H":0.4035,"UC_M":0.345,"ER":0.44,"TC":0.245,"FC":0,"HO":0},"P":{"H":{"chi":0.9,"a":0.735,"k":0.775,"f":0.84,"d":0.96},"M":{"chi":0.785,"a":0.61,"k":0.745,"f":0.255,"d":0.61},"G":{"chi":0.57,"a":0.54,"k":0.65,"f":0.78,"d":0.88}},"y":0.71175,"o1":"S_N","os":"S_N"},{"id":23,"f":"E","t":"Optimization conflicts with safety window","x":{"CP_H":0.665,"CP_M":0.6835,"TR_H":0.8562,"TR_M":0.68825,"VA_H":0.9209,"VA_M":0.7,"VA_HM":0.7825,"UC_H":0.4035,"UC_M":0.345,"ER":0.47,"TC":0.245,"FC":0,"HO":1},"P":{"H":{"chi":0.87,"a":0.815,"k":0.775,"f":0.92,"d":0.96},"M":{"chi":0.81,"a":0.602,"k":0.745,"f":0.255,"d":0.61},"G":{"chi":0.578,"a":0.62,"k":0.65,"f":0.78,"d":0.88}},"y":0.70433,"o1":"S_H","os":"S_H"},{"id":24,"f":"E","t":"Sensor degradation forces manual fallback","x":{"CP_H":0.5425,"CP_M":0.65475,"TR_H":0.855,"TR_M":0.6868,"VA_H":0.92,"VA_M":0.6984,"VA_HM":0.8175,"UC_H":0.465,"UC_M":0.415,"ER":0.44,"TC":0.245,"FC":0,"HO":1},"P":{"H":{"chi":0.765,"a":0.765,"k":0.675,"f":0.92,"d":0.96},"M":{"chi":0.755,"a":0.5972,"k":0.7361,"f":0.255,"d":0.61},"G":{"chi":0.578,"a":0.62,"k":0.65,"f":0.78,"d":0.88}},"y":0.52426,"o1":"S_H","os":"S_H"},{"id":25,"f":"E","t":"Autonomous adjustment during peak demand","x":{"CP_H":0.61,"CP_M":0.786,"TR_H":0.855,"TR_M":0.81,"VA_H":0.92,"VA_M":0.7,"VA_HM":0.8175,"UC_H":0.405,"UC_M":0.345,"ER":0.44,"TC":0.345,"FC":0,"HO":0},"P":{"H":{"chi":0.76,"a":0.685,"k":0.725,"f":0.84,"d":0.96},"M":{"chi":0.92,"a":0.67,"k":0.745,"f":0.255,"d":0.61},"G":{"chi":0.57,"a":0.54,"k":0.65,"f":0.78,"d":0.88}},"y":0.67837,"o1":"S_HM","os":"S_HM"},{"id":26,"f":"F","t":"Student is struggling but the cause is unclear","x":{"CP_H":0.695,"CP_M":0.597,"TR_H":0.865,"TR_M":0.675,"VA_H":0.895,"VA_M":0.7,"VA_HM":0.805,"UC_H":0.339,"UC_M":0.36,"ER":0.235,"TC":0.08,"FC":0,"HO":0},"P":{"H":{"chi":0.925,"a":0.79,"k":0.73,"f":0.88,"d":0.82},"M":{"chi":0.69,"a":0.465,"k":0.6875,"f":0.205,"d":0.525},"G":{"chi":0.3725,"a":0.39,"k":0.5675,"f":0.765,"d":0.77}},"y":0.6721,"o1":"S_H","os":"S_H"},{"id":27,"f":"F","t":"Known concept gap but unknown teaching strategy","x":{"CP_H":0.7025,"CP_M":0.60075,"TR_H":0.8674,"TR_M":0.675,"VA_H":0.8968,"VA_M":0.7,"VA_HM":0.805,"UC_H":0.3585,"UC_M":0.375,"ER":0.235,"TC":0.08,"FC":0,"HO":0},"P":{"H":{"chi":0.945,"a":0.84,"k":0.78,"f":0.88,"d":0.82},"M":{"chi":0.715,"a":0.465,"k":0.6875,"f":0.205,"d":0.525},"G":{"chi":0.3725,"a":0.39,"k":0.5675,"f":0.765,"d":0.77}},"y":0.70996,"o1":"S_H","os":"S_H"},{"id":28,"f":"F","t":"AI recommendation conflicts with teacher intuition","x":{"CP_H":0.71,"CP_M":0.6045,"TR_H":0.865,"TR_M":0.6715,"VA_H":0.895,"VA_M":0.7,"VA_HM":0.735,"UC_H":0.3,"UC_M":0.345,"ER":0.235,"TC":0.08,"FC":0,"HO":0},"P":{"H":{"chi":0.89,"a":0.79,"k":0.78,"f":0.88,"d":0.82},"M":{"chi":0.74,"a":0.465,"k":0.69,"f":0.205,"d":0.525},"G":{"chi":0.3725,"a":0.39,"k":0.5675,"f":0.765,"d":0.77}},"y":0.71109,"o1":"S_H","os":"S_H"},{"id":29,"f":"F","t":"Student follows AI hints without real understanding","x":{"CP_H":0.7275,"CP_M":0.60825,"TR_H":0.8662,"TR_M":0.67325,"VA_H":0.8959,"VA_M":0.7,"VA_HM":0.77,"UC_H":0.2985,"UC_M":0.345,"ER":0.235,"TC":0.08,"FC":0,"HO":0},"P":{"H":{"chi":0.91,"a":0.84,"k":0.83,"f":0.88,"d":0.82},"M":{"chi":0.765,"a":0.465,"k":0.69,"f":0.205,"d":0.525},"G":{"chi":0.3725,"a":0.39,"k":0.5675,"f":0.765,"d":0.77}},"y":0.75778,"o1":"S_H","os":"S_H"},{"id":30,"f":"F","t":"Teacher delegates routine feedback but not grading judgment","x":{"CP_H":0.685,"CP_M":0.652,"TR_H":0.865,"TR_M":0.735,"VA_H":0.895,"VA_M":0.7,"VA_HM":0.805,"UC_H":0.3,"UC_M":0.345,"ER":0.235,"TC":0.08,"FC":0,"HO":0},"P":{"H":{"chi":0.83,"a":0.79,"k":0.78,"f":0.88,"d":0.82},"M":{"chi":0.85,"a":0.525,"k":0.69,"f":0.205,"d":0.525},"G":{"chi":0.3725,"a":0.39,"k":0.5675,"f":0.765,"d":0.77}},"y":0.7965,"o1":"S_N","os":"S_N"},{"id":31,"f":"G","t":"Known legal issue but unknown precedent","x":{"CP_H":0.67,"CP_M":0.66,"TR_H":0.8812,"TR_M":0.69,"VA_H":0.9209,"VA_M":0.7,"VA_HM":0.8175,"UC_H":0.3875,"UC_M":0.36,"ER":0.385,"TC":0.135,"FC":0,"HO":0},"P":{"H":{"chi":0.975,"a":0.87,"k":0.78,"f":0.9,"d":0.92},"M":{"chi":0.76,"a":0.445,"k":0.7425,"f":0.18,"d":0.505},"G":{"chi":0.525,"a":0.51,"k":0.6375,"f":0.78,"d":0.86}},"y":0.68949,"o1":"S_N","os":"S_N"},{"id":32,"f":"G","t":"AI finds precedent but misses jurisdictional nuance","x":{"CP_H":0.7075,"CP_M":0.62,"TR_H":0.88,"TR_M":0.6868,"VA_H":0.92,"VA_M":0.6984,"VA_HM":0.8175,"UC_H":0.3215,"UC_M":0.37,"ER":0.385,"TC":0.135,"FC":0,"HO":0},"P":{"H":{"chi":0.92,"a":0.82,"k":0.78,"f":0.9,"d":0.92},"M":{"chi":0.705,"a":0.4402,"k":0.7386,"f":0.18,"d":0.505},"G":{"chi":0.525,"a":0.51,"k":0.6375,"f":0.78,"d":0.86}},"y":0.61451,"o1":"S_H","os":"S_H"},{"id":33,"f":"G","t":"Time pressure during contract review","x":{"CP_H":0.655,"CP_M":0.62,"TR_H":0.88,"TR_M":0.6868,"VA_H":0.92,"VA_M":0.6984,"VA_HM":0.8175,"UC_H":0.35,"UC_M":0.385,"ER":0.385,"TC":0.185,"FC":0,"HO":0},"P":{"H":{"chi":0.865,"a":0.82,"k":0.73,"f":0.9,"d":0.92},"M":{"chi":0.73,"a":0.4402,"k":0.7361,"f":0.18,"d":0.505},"G":{"chi":0.525,"a":0.51,"k":0.6375,"f":0.78,"d":0.86}},"y":0.56091,"o1":"S_H","os":"S_H"},{"id":34,"f":"G","t":"Opaque legal summary with confident language","x":{"CP_H":0.6025,"CP_M":0.62,"TR_H":0.88,"TR_M":0.6868,"VA_H":0.92,"VA_M":0.6984,"VA_HM":0.8175,"UC_H":0.38,"UC_M":0.4,"ER":0.385,"TC":0.185,"FC":0,"HO":0},"P":{"H":{"chi":0.835,"a":0.82,"k":0.73,"f":0.9,"d":0.92},"M":{"chi":0.755,"a":0.4402,"k":0.7361,"f":0.18,"d":0.505},"G":{"chi":0.525,"a":0.51,"k":0.6375,"f":0.78,"d":0.86}},"y":0.62116,"o1":"S_N","os":"S_N"},{"id":35,"f":"G","t":"Client goal conflicts with legal prudence","x":{"CP_H":0.7,"CP_M":0.66,"TR_H":0.8812,"TR_M":0.68825,"VA_H":0.9209,"VA_M":0.7,"VA_HM":0.7825,"UC_H":0.3185,"UC_M":0.33,"ER":0.385,"TC":0.185,"FC":0,"HO":1},"P":{"H":{"chi":0.88,"a":0.95,"k":0.83,"f":0.98,"d":0.92},"M":{"chi":0.86,"a":0.437,"k":0.745,"f":0.18,"d":0.505},"G":{"chi":0.533,"a":0.59,"k":0.6375,"f":0.78,"d":0.86}},"y":0.73406,"o1":"S_H","os":"S_H"},{"id":36,"f":"H","t":"AI flags a possible intrusion with weak evidence","x":{"CP_H":0.565,"CP_M":0.681,"TR_H":0.84,"TR_M":0.7318,"VA_H":0.895,"VA_M":0.7384,"VA_HM":0.8175,"UC_H":0.494,"UC_M":0.37,"ER":0.43,"TC":0.3,"FC":0,"HO":0},"P":{"H":{"chi":0.855,"a":0.685,"k":0.675,"f":0.84,"d":0.94},"M":{"chi":0.75,"a":0.6402,"k":0.7911,"f":0.255,"d":0.625},"G":{"chi":0.5075,"a":0.48,"k":0.605,"f":0.765,"d":0.83}},"y":0.52999,"o1":"S_HM","os":"S_HM"},{"id":37,"f":"H","t":"Known attack pattern but unknown entry point","x":{"CP_H":0.5825,"CP_M":0.73225,"TR_H":0.8412,"TR_M":0.735,"VA_H":0.8959,"VA_M":0.74,"VA_HM":0.8175,"UC_H":0.485,"UC_M":0.33,"ER":0.4,"TC":0.3,"FC":0,"HO":0},"P":{"H":{"chi":0.875,"a":0.735,"k":0.725,"f":0.84,"d":0.94},"M":{"chi":0.855,"a":0.645,"k":0.7975,"f":0.255,"d":0.625},"G":{"chi":0.5075,"a":0.48,"k":0.605,"f":0.765,"d":0.83}},"y":0.66629,"o1":"S_HM","os":"S_HM"},{"id":38,"f":"H","t":"AI recommends containment that may disrupt operations","x":{"CP_H":0.65,"CP_M":0.7435,"TR_H":0.8412,"TR_M":0.735,"VA_H":0.8959,"VA_M":0.74,"VA_HM":0.8175,"UC_H":0.4235,"UC_M":0.3,"ER":0.43,"TC":0.4,"FC":0,"HO":0},"P":{"H":{"chi":0.87,"a":0.735,"k":0.775,"f":0.84,"d":0.94},"M":{"chi":0.88,"a":0.645,"k":0.8,"f":0.255,"d":0.625},"G":{"chi":0.5075,"a":0.48,"k":0.605,"f":0.765,"d":0.83}},"y":0.71111,"o1":"S_HM","os":"S_HM"},{"id":39,"f":"H","t":"Human suspects insider threat that AI underweights","x":{"CP_H":0.6375,"CP_M":0.75475,"TR_H":0.8412,"TR_M":0.7315,"VA_H":0.8959,"VA_M":0.74,"VA_HM":0.7475,"UC_H":0.4235,"UC_M":0.3,"ER":0.4,"TC":0.3,"FC":0,"HO":0},"P":{"H":{"chi":0.84,"a":0.735,"k":0.775,"f":0.84,"d":0.94},"M":{"chi":0.905,"a":0.645,"k":0.8,"f":0.255,"d":0.625},"G":{"chi":0.5075,"a":0.48,"k":0.605,"f":0.765,"d":0.83}},"y":0.71453,"o1":"S_HM","os":"S_HM"},{"id":40,"f":"H","t":"Autonomous response within a sandboxed boundary","x":{"CP_H":0.555,"CP_M":0.866,"TR_H":0.84,"TR_M":0.885,"VA_H":0.895,"VA_M":0.74,"VA_HM":0.8175,"UC_H":0.455,"UC_M":0.315,"ER":0.4,"TC":0.3,"FC":0,"HO":0},"P":{"H":{"chi":0.735,"a":0.685,"k":0.675,"f":0.84,"d":0.94},"M":{"chi":0.99,"a":0.705,"k":0.7975,"f":0.255,"d":0.625},"G":{"chi":0.5075,"a":0.48,"k":0.605,"f":0.765,"d":0.83}},"y":0.65257,"o1":"S_HtoM","os":"S_M"},{"id":41,"f":"I","t":"Demand forecast is unstable","x":{"CP_H":0.565,"CP_M":0.721,"TR_H":0.825,"TR_M":0.75,"VA_H":0.87,"VA_M":0.76,"VA_HM":0.8175,"UC_H":0.474,"UC_M":0.315,"ER":0.305,"TC":0.295,"FC":0,"HO":0},"P":{"H":{"chi":0.855,"a":0.685,"k":0.675,"f":0.84,"d":0.88},"M":{"chi":0.83,"a":0.645,"k":0.7975,"f":0.255,"d":0.625},"G":{"chi":0.4,"a":0.39,"k":0.5475,"f":0.75,"d":0.76}},"y":0.63962,"o1":"S_N","os":"S_N"},{"id":42,"f":"I","t":"Best route conflicts with supplier relationship","x":{"CP_H":0.6925,"CP_M":0.73225,"TR_H":0.8274,"TR_M":0.74825,"VA_H":0.8718,"VA_M":0.76,"VA_HM":0.7825,"UC_H":0.4035,"UC_M":0.285,"ER":0.305,"TC":0.295,"FC":0,"HO":0},"P":{"H":{"chi":0.9,"a":0.735,"k":0.775,"f":0.84,"d":0.88},"M":{"chi":0.855,"a":0.645,"k":0.8,"f":0.255,"d":0.625},"G":{"chi":0.4,"a":0.39,"k":0.5475,"f":0.75,"d":0.76}},"y":0.7394,"o1":"S_HM","os":"S_HM"},{"id":43,"f":"I","t":"Port disruption forces rapid replanning","x":{"CP_H":0.62,"CP_M":0.7435,"TR_H":0.825,"TR_M":0.75,"VA_H":0.87,"VA_M":0.76,"VA_HM":0.8175,"UC_H":0.405,"UC_M":0.285,"ER":0.305,"TC":0.295,"FC":0,"HO":0},"P":{"H":{"chi":0.82,"a":0.685,"k":0.725,"f":0.84,"d":0.88},"M":{"chi":0.88,"a":0.645,"k":0.8,"f":0.255,"d":0.625},"G":{"chi":0.4,"a":0.39,"k":0.5475,"f":0.75,"d":0.76}},"y":0.69727,"o1":"S_HM","os":"S_HM"},{"id":44,"f":"I","t":"AI has data but not reputational signals","x":{"CP_H":0.6075,"CP_M":0.75475,"TR_H":0.825,"TR_M":0.75,"VA_H":0.87,"VA_M":0.76,"VA_HM":0.8175,"UC_H":0.405,"UC_M":0.285,"ER":0.305,"TC":0.245,"FC":0,"HO":1},"P":{"H":{"chi":0.79,"a":0.765,"k":0.725,"f":0.92,"d":0.88},"M":{"chi":0.905,"a":0.637,"k":0.8,"f":0.255,"d":0.625},"G":{"chi":0.408,"a":0.47,"k":0.5475,"f":0.75,"d":0.76}},"y":0.70115,"o1":"S_H","os":"S_H"},{"id":45,"f":"I","t":"Autonomous replenishment with exception review","x":{"CP_H":0.595,"CP_M":0.846,"TR_H":0.825,"TR_M":0.87,"VA_H":0.87,"VA_M":0.76,"VA_HM":0.8175,"UC_H":0.405,"UC_M":0.285,"ER":0.335,"TC":0.295,"FC":0,"HO":0},"P":{"H":{"chi":0.76,"a":0.685,"k":0.725,"f":0.84,"d":0.88},"M":{"chi":0.99,"a":0.705,"k":0.8,"f":0.255,"d":0.625},"G":{"chi":0.4,"a":0.39,"k":0.5475,"f":0.75,"d":0.76}},"y":0.70982,"o1":"S_N","os":"S_N"},{"id":46,"f":"J","t":"Large applicant pool with limited review time","x":{"CP_H":0.66,"CP_M":0.667,"TR_H":0.855,"TR_M":0.68825,"VA_H":0.92,"VA_M":0.7,"VA_HM":0.7825,"UC_H":0.374,"UC_M":0.315,"ER":0.33,"TC":0.135,"FC":0,"HO":0},"P":{"H":{"chi":0.88,"a":0.745,"k":0.725,"f":0.88,"d":0.88},"M":{"chi":0.76,"a":0.5,"k":0.745,"f":0.205,"d":0.54},"G":{"chi":0.48,"a":0.48,"k":0.625,"f":0.78,"d":0.84}},"y":0.69644,"o1":"S_N","os":"S_N"},{"id":47,"f":"J","t":"Candidate looks weak on paper but strong in interview","x":{"CP_H":0.6475,"CP_M":0.67075,"TR_H":0.855,"TR_M":0.68825,"VA_H":0.92,"VA_M":0.7,"VA_HM":0.7825,"UC_H":0.3665,"UC_M":0.315,"ER":0.33,"TC":0.135,"FC":0,"HO":0},"P":{"H":{"chi":0.85,"a":0.745,"k":0.725,"f":0.88,"d":0.88},"M":{"chi":0.785,"a":0.5,"k":0.745,"f":0.205,"d":0.54},"G":{"chi":0.48,"a":0.48,"k":0.625,"f":0.78,"d":0.84}},"y":0.69632,"o1":"S_N","os":"S_N"},{"id":48,"f":"J","t":"AI ranking may reflect historical bias","x":{"CP_H":0.665,"CP_M":0.6745,"TR_H":0.8562,"TR_M":0.68825,"VA_H":0.9209,"VA_M":0.69,"VA_HM":0.7725,"UC_H":0.3635,"UC_M":0.315,"ER":0.49,"TC":0.135,"FC":1,"HO":0},"P":{"H":{"chi":0.87,"a":0.855,"k":0.775,"f":0.88,"d":0.88},"M":{"chi":0.81,"a":0.4952,"k":0.745,"f":0.205,"d":0.54},"G":{"chi":0.4848,"a":0.48,"k":0.625,"f":0.78,"d":0.84}},"y":0.66523,"o1":"S_H","os":"S_H"},{"id":49,"f":"J","t":"Known role requirements but unclear future potential","x":{"CP_H":0.6425,"CP_M":0.67825,"TR_H":0.8574,"TR_M":0.69,"VA_H":0.9218,"VA_M":0.7,"VA_HM":0.8175,"UC_H":0.392,"UC_M":0.33,"ER":0.33,"TC":0.185,"FC":0,"HO":0},"P":{"H":{"chi":0.815,"a":0.795,"k":0.725,"f":0.88,"d":0.88},"M":{"chi":0.835,"a":0.5,"k":0.7425,"f":0.205,"d":0.54},"G":{"chi":0.48,"a":0.48,"k":0.625,"f":0.78,"d":0.84}},"y":0.69303,"o1":"S_N","os":"S_N"},{"id":50,"f":"J","t":"AI drafts interview questions but human leads evaluation","x":{"CP_H":0.61,"CP_M":0.682,"TR_H":0.855,"TR_M":0.69,"VA_H":0.92,"VA_M":0.7,"VA_HM":0.8175,"UC_H":0.365,"UC_M":0.315,"ER":0.33,"TC":0.135,"FC":0,"HO":0},"P":{"H":{"chi":0.76,"a":0.745,"k":0.725,"f":0.88,"d":0.88},"M":{"chi":0.86,"a":0.5,"k":0.745,"f":0.205,"d":0.54},"G":{"chi":0.48,"a":0.48,"k":0.625,"f":0.78,"d":0.84}},"y":0.69817,"o1":"S_HM","os":"S_HM"},{"id":51,"f":"K","t":"Conflicting reports after a natural disaster","x":{"CP_H":0.58,"CP_M":0.661,"TR_H":0.855,"TR_M":0.68825,"VA_H":0.92,"VA_M":0.7,"VA_HM":0.7825,"UC_H":0.494,"UC_M":0.375,"ER":0.47,"TC":0.35,"FC":0,"HO":0},"P":{"H":{"chi":0.855,"a":0.685,"k":0.675,"f":0.84,"d":0.96},"M":{"chi":0.76,"a":0.61,"k":0.7425,"f":0.255,"d":0.61},"G":{"chi":0.57,"a":0.54,"k":0.65,"f":0.78,"d":0.88}},"y":0.59304,"o1":"S_HM","os":"S_HM"},{"id":52,"f":"K","t":"Known priority but unknown access path","x":{"CP_H":0.5975,"CP_M":0.67225,"TR_H":0.8562,"TR_M":0.69,"VA_H":0.9209,"VA_M":0.7,"VA_HM":0.8175,"UC_H":0.485,"UC_M":0.375,"ER":0.44,"TC":0.3,"FC":0,"HO":0},"P":{"H":{"chi":0.875,"a":0.735,"k":0.725,"f":0.84,"d":0.96},"M":{"chi":0.785,"a":0.61,"k":0.7425,"f":0.255,"d":0.61},"G":{"chi":0.57,"a":0.54,"k":0.65,"f":0.78,"d":0.88}},"y":0.64944,"o1":"S_HM","os":"S_HM"},{"id":53,"f":"K","t":"AI optimizes efficiency but not equity","x":{"CP_H":0.635,"CP_M":0.6835,"TR_H":0.855,"TR_M":0.6865,"VA_H":0.92,"VA_M":0.6975,"VA_HM":0.745,"UC_H":0.425,"UC_M":0.345,"ER":0.465,"TC":0.3,"FC":1,"HO":1},"P":{"H":{"chi":0.82,"a":0.825,"k":0.725,"f":0.92,"d":0.96},"M":{"chi":0.81,"a":0.5972,"k":0.745,"f":0.255,"d":0.61},"G":{"chi":0.5828,"a":0.62,"k":0.65,"f":0.78,"d":0.88}},"y":0.60076,"o1":"S_H","os":"S_H"},{"id":54,"f":"K","t":"Communications outage reduces model quality","x":{"CP_H":0.5425,"CP_M":0.65475,"TR_H":0.855,"TR_M":0.6868,"VA_H":0.92,"VA_M":0.6984,"VA_HM":0.8175,"UC_H":0.485,"UC_M":0.415,"ER":0.44,"TC":0.35,"FC":0,"HO":0},"P":{"H":{"chi":0.765,"a":0.685,"k":0.675,"f":0.84,"d":0.96},"M":{"chi":0.755,"a":0.6052,"k":0.7361,"f":0.255,"d":0.61},"G":{"chi":0.57,"a":0.54,"k":0.65,"f":0.78,"d":0.88}},"y":0.51386,"o1":"S_HM","os":"S_HM"},{"id":55,"f":"K","t":"Delegated drone and convoy scheduling within limits","x":{"CP_H":0.61,"CP_M":0.766,"TR_H":0.855,"TR_M":0.78,"VA_H":0.92,"VA_M":0.7,"VA_HM":0.8175,"UC_H":0.425,"UC_M":0.345,"ER":0.44,"TC":0.35,"FC":0,"HO":0},"P":{"H":{"chi":0.76,"a":0.685,"k":0.725,"f":0.84,"d":0.96},"M":{"chi":0.92,"a":0.67,"k":0.745,"f":0.255,"d":0.61},"G":{"chi":0.57,"a":0.54,"k":0.65,"f":0.78,"d":0.88}},"y":0.67173,"o1":"S_HM","os":"S_HM"},{"id":56,"f":"L","t":"Unusual inactivity detected at home","x":{"CP_H":0.695,"CP_M":0.594,"TR_H":0.88,"TR_M":0.66,"VA_H":0.92,"VA_M":0.6788,"VA_HM":0.8034,"UC_H":0.379,"UC_M":0.3916,"ER":0.4766,"TC":0.19,"FC":0,"HO":0},"P":{"H":{"chi":0.925,"a":0.76,"k":0.73,"f":0.86,"d":0.92},"M":{"chi":0.69,"a":0.52,"k":0.6875,"f":0.23,"d":0.56},"G":{"chi":0.525,"a":0.51,"k":0.6375,"f":0.78,"d":0.86}},"y":0.62182,"o1":"S_H","os":"S_H"},{"id":57,"f":"L","t":"User rejects helpful reminders","x":{"CP_H":0.7225,"CP_M":0.6015,"TR_H":0.88,"TR_M":0.66,"VA_H":0.92,"VA_M":0.68,"VA_HM":0.805,"UC_H":0.3415,"UC_M":0.375,"ER":0.385,"TC":0.19,"FC":0,"HO":0},"P":{"H":{"chi":0.92,"a":0.76,"k":0.78,"f":0.86,"d":0.92},"M":{"chi":0.715,"a":0.52,"k":0.69,"f":0.23,"d":0.56},"G":{"chi":0.525,"a":0.51,"k":0.6375,"f":0.78,"d":0.86}},"y":0.68375,"o1":"S_H","os":"S_H"},{"id":58,"f":"L","t":"Family wants more monitoring than the resident accepts","x":{"CP_H":0.71,"CP_M":0.609,"TR_H":0.88,"TR_M":0.65825,"VA_H":0.92,"VA_M":0.6788,"VA_HM":0.7684,"UC_H":0.34,"UC_M":0.3766,"ER":0.4466,"TC":0.19,"FC":0,"HO":0},"P":{"H":{"chi":0.89,"a":0.76,"k":0.78,"f":0.86,"d":0.92},"M":{"chi":0.74,"a":0.52,"k":0.69,"f":0.23,"d":0.56},"G":{"chi":0.525,"a":0.51,"k":0.6375,"f":0.78,"d":0.86}},"y":0.67009,"o1":"S_H","os":"S_H"},{"id":59,"f":"L","t":"AI detects a subtle pattern the resident misses","x":{"CP_H":0.7275,"CP_M":0.6165,"TR_H":0.8812,"TR_M":0.66,"VA_H":0.9209,"VA_M":0.68,"VA_HM":0.805,"UC_H":0.3385,"UC_M":0.375,"ER":0.385,"TC":0.19,"FC":0,"HO":0},"P":{"H":{"chi":0.91,"a":0.81,"k":0.83,"f":0.86,"d":0.92},"M":{"chi":0.765,"a":0.52,"k":0.69,"f":0.23,"d":0.56},"G":{"chi":0.525,"a":0.51,"k":0.6375,"f":0.78,"d":0.86}},"y":0.72614,"o1":"S_H","os":"S_H"},{"id":60,"f":"L","t":"Routine home adjustments are automated but emergency action is supervised","x":{"CP_H":0.685,"CP_M":0.664,"TR_H":0.88,"TR_M":0.72,"VA_H":0.92,"VA_M":0.68,"VA_HM":0.805,"UC_H":0.34,"UC_M":0.375,"ER":0.445,"TC":0.24,"FC":0,"HO":0},"P":{"H":{"chi":0.83,"a":0.76,"k":0.78,"f":0.86,"d":0.92},"M":{"chi":0.85,"a":0.58,"k":0.69,"f":0.23,"d":0.56},"G":{"chi":0.525,"a":0.51,"k":0.6375,"f":0.78,"d":0.86}},"y":0.6785,"o1":"S_N","os":"S_N"},{"id":61,"f":"M","t":"Crop stress is detected but the cause is uncertain","x":{"CP_H":0.57,"CP_M":0.661,"TR_H":0.8412,"TR_M":0.705,"VA_H":0.8959,"VA_M":0.72,"VA_HM":0.8175,"UC_H":0.4825,"UC_M":0.36,"ER":0.29,"TC":0.19,"FC":0,"HO":0},"P":{"H":{"chi":0.905,"a":0.735,"k":0.725,"f":0.84,"d":0.86},"M":{"chi":0.76,"a":0.61,"k":0.7425,"f":0.255,"d":0.61},"G":{"chi":0.4175,"a":0.42,"k":0.58,"f":0.765,"d":0.79}},"y":0.67712,"o1":"S_HM","os":"S_HM"},{"id":62,"f":"M","t":"Weather forecast conflicts with local experience","x":{"CP_H":0.7075,"CP_M":0.67225,"TR_H":0.8424,"TR_M":0.7015,"VA_H":0.8968,"VA_M":0.72,"VA_HM":0.7475,"UC_H":0.3835,"UC_M":0.315,"ER":0.29,"TC":0.19,"FC":0,"HO":0},"P":{"H":{"chi":0.9,"a":0.735,"k":0.775,"f":0.84,"d":0.86},"M":{"chi":0.785,"a":0.61,"k":0.745,"f":0.255,"d":0.61},"G":{"chi":0.4175,"a":0.42,"k":0.58,"f":0.765,"d":0.79}},"y":0.73782,"o1":"S_N","os":"S_N"},{"id":63,"f":"M","t":"AI optimizes yield but not soil stewardship","x":{"CP_H":0.635,"CP_M":0.6835,"TR_H":0.84,"TR_M":0.70325,"VA_H":0.895,"VA_M":0.72,"VA_HM":0.7825,"UC_H":0.385,"UC_M":0.315,"ER":0.29,"TC":0.19,"FC":0,"HO":0},"P":{"H":{"chi":0.82,"a":0.685,"k":0.725,"f":0.84,"d":0.86},"M":{"chi":0.81,"a":0.61,"k":0.745,"f":0.255,"d":0.61},"G":{"chi":0.4175,"a":0.42,"k":0.58,"f":0.765,"d":0.79}},"y":0.69569,"o1":"S_HM","os":"S_HM"},{"id":64,"f":"M","t":"Equipment can act automatically within geofenced rules","x":{"CP_H":0.6225,"CP_M":0.77475,"TR_H":0.84,"TR_M":0.825,"VA_H":0.895,"VA_M":0.72,"VA_HM":0.8175,"UC_H":0.385,"UC_M":0.315,"ER":0.32,"TC":0.19,"FC":0,"HO":0},"P":{"H":{"chi":0.79,"a":0.685,"k":0.725,"f":0.84,"d":0.86},"M":{"chi":0.895,"a":0.67,"k":0.745,"f":0.255,"d":0.61},"G":{"chi":0.4175,"a":0.42,"k":0.58,"f":0.765,"d":0.79}},"y":0.7127,"o1":"S_HM","os":"S_HM"},{"id":65,"f":"M","t":"Market conditions alter planting decisions","x":{"CP_H":0.64,"CP_M":0.706,"TR_H":0.8412,"TR_M":0.705,"VA_H":0.8959,"VA_M":0.72,"VA_HM":0.8175,"UC_H":0.3835,"UC_M":0.315,"ER":0.29,"TC":0.19,"FC":0,"HO":1},"P":{"H":{"chi":0.81,"a":0.815,"k":0.775,"f":0.92,"d":0.86},"M":{"chi":0.86,"a":0.602,"k":0.745,"f":0.255,"d":0.61},"G":{"chi":0.4255,"a":0.5,"k":0.58,"f":0.765,"d":0.79}},"y":0.74302,"o1":"S_H","os":"S_H"},{"id":66,"f":"N","t":"Traffic optimization may hurt neighborhood quality","x":{"CP_H":0.72,"CP_M":0.657,"TR_H":0.865,"TR_M":0.705,"VA_H":0.895,"VA_M":0.7175,"VA_HM":0.815,"UC_H":0.329,"UC_M":0.33,"ER":0.37,"TC":0.135,"FC":1,"HO":0},"P":{"H":{"chi":0.95,"a":0.85,"k":0.78,"f":0.88,"d":0.9},"M":{"chi":0.76,"a":0.4952,"k":0.745,"f":0.205,"d":0.54},"G":{"chi":0.4673,"a":0.45,"k":0.5925,"f":0.765,"d":0.81}},"y":0.65475,"o1":"S_H","os":"S_H"},{"id":67,"f":"N","t":"Known congestion problem but unclear intervention mix","x":{"CP_H":0.6175,"CP_M":0.66075,"TR_H":0.8662,"TR_M":0.705,"VA_H":0.8959,"VA_M":0.72,"VA_HM":0.8175,"UC_H":0.41,"UC_M":0.375,"ER":0.345,"TC":0.135,"FC":0,"HO":0},"P":{"H":{"chi":0.945,"a":0.84,"k":0.78,"f":0.88,"d":0.9},"M":{"chi":0.785,"a":0.5,"k":0.7425,"f":0.205,"d":0.54},"G":{"chi":0.4625,"a":0.45,"k":0.5925,"f":0.765,"d":0.81}},"y":0.68617,"o1":"S_HM","os":"S_HM"},{"id":68,"f":"N","t":"Historical data underrepresents future change","x":{"CP_H":0.725,"CP_M":0.6645,"TR_H":0.8662,"TR_M":0.705,"VA_H":0.8959,"VA_M":0.72,"VA_HM":0.8175,"UC_H":0.3185,"UC_M":0.33,"ER":0.345,"TC":0.135,"FC":0,"HO":0},"P":{"H":{"chi":0.94,"a":0.84,"k":0.83,"f":0.88,"d":0.9},"M":{"chi":0.81,"a":0.5,"k":0.745,"f":0.205,"d":0.54},"G":{"chi":0.4625,"a":0.45,"k":0.5925,"f":0.765,"d":0.81}},"y":0.75094,"o1":"S_N","os":"S_N"},{"id":69,"f":"N","t":"Community feedback conflicts with optimization model","x":{"CP_H":0.6825,"CP_M":0.66825,"TR_H":0.865,"TR_M":0.70325,"VA_H":0.895,"VA_M":0.72,"VA_HM":0.7825,"UC_H":0.32,"UC_M":0.33,"ER":0.345,"TC":0.135,"FC":0,"HO":0},"P":{"H":{"chi":0.86,"a":0.79,"k":0.78,"f":0.88,"d":0.9},"M":{"chi":0.835,"a":0.5,"k":0.745,"f":0.205,"d":0.54},"G":{"chi":0.4625,"a":0.45,"k":0.5925,"f":0.765,"d":0.81}},"y":0.70249,"o1":"S_N","os":"S_N"},{"id":70,"f":"N","t":"AI automates scenario analysis but not policy choice","x":{"CP_H":0.67,"CP_M":0.672,"TR_H":0.865,"TR_M":0.705,"VA_H":0.895,"VA_M":0.72,"VA_HM":0.8175,"UC_H":0.32,"UC_M":0.33,"ER":0.345,"TC":0.135,"FC":0,"HO":0},"P":{"H":{"chi":0.83,"a":0.79,"k":0.78,"f":0.88,"d":0.9},"M":{"chi":0.86,"a":0.5,"k":0.745,"f":0.205,"d":0.54},"G":{"chi":0.4625,"a":0.45,"k":0.5925,"f":0.765,"d":0.81}},"y":0.70595,"o1":"S_N","os":"S_N"},{"id":71,"f":"O","t":"Client goal is vague and evolving","x":{"CP_H":0.64,"CP_M":0.654,"TR_H":0.835,"TR_M":0.735,"VA_H":0.845,"VA_M":0.76,"VA_HM":0.8175,"UC_H":0.369,"UC_M":0.315,"ER":0.1,"TC":0.08,"FC":0,"HO":0},"P":{"H":{"chi":0.925,"a":0.76,"k":0.73,"f":0.86,"d":0.74},"M":{"chi":0.76,"a":0.555,"k":0.7425,"f":0.23,"d":0.575},"G":{"chi":0.2025,"a":0.24,"k":0.465,"f":0.735,"d":0.65}},"y":0.69645,"o1":"S_HM","os":"S_HM"},{"id":72,"f":"O","t":"AI output is impressive but off-brand","x":{"CP_H":0.7375,"CP_M":0.6615,"TR_H":0.8362,"TR_M":0.73325,"VA_H":0.8459,"VA_M":0.76,"VA_HM":0.7825,"UC_H":0.3,"UC_M":0.285,"ER":0.1,"TC":0.08,"FC":0,"HO":0},"P":{"H":{"chi":0.97,"a":0.81,"k":0.83,"f":0.86,"d":0.74},"M":{"chi":0.785,"a":0.555,"k":0.745,"f":0.23,"d":0.575},"G":{"chi":0.2025,"a":0.24,"k":0.465,"f":0.735,"d":0.65}},"y":0.79261,"o1":"S_N","os":"S_N"},{"id":73,"f":"O","t":"Fast ideation creates originality concern","x":{"CP_H":0.695,"CP_M":0.669,"TR_H":0.835,"TR_M":0.73325,"VA_H":0.845,"VA_M":0.76,"VA_HM":0.7825,"UC_H":0.3,"UC_M":0.285,"ER":0.1,"TC":0.08,"FC":0,"HO":0},"P":{"H":{"chi":0.89,"a":0.76,"k":0.78,"f":0.86,"d":0.74},"M":{"chi":0.81,"a":0.555,"k":0.745,"f":0.23,"d":0.575},"G":{"chi":0.2025,"a":0.24,"k":0.465,"f":0.735,"d":0.65}},"y":0.74902,"o1":"S_HM","os":"S_HM"},{"id":74,"f":"O","t":"AI helps refine execution, not concept ownership","x":{"CP_H":0.6825,"CP_M":0.6765,"TR_H":0.835,"TR_M":0.735,"VA_H":0.845,"VA_M":0.76,"VA_HM":0.8175,"UC_H":0.3,"UC_M":0.285,"ER":0.1,"TC":0.13,"FC":0,"HO":0},"P":{"H":{"chi":0.86,"a":0.76,"k":0.78,"f":0.86,"d":0.74},"M":{"chi":0.835,"a":0.555,"k":0.745,"f":0.23,"d":0.575},"G":{"chi":0.2025,"a":0.24,"k":0.465,"f":0.735,"d":0.65}},"y":0.74885,"o1":"S_HM","os":"S_HM"},{"id":75,"f":"O","t":"Autonomous generation is allowed inside a constrained style system","x":{"CP_H":0.67,"CP_M":0.764,"TR_H":0.835,"TR_M":0.855,"VA_H":0.845,"VA_M":0.76,"VA_HM":0.8175,"UC_H":0.3,"UC_M":0.285,"ER":0.1,"TC":0.08,"FC":0,"HO":0},"P":{"H":{"chi":0.83,"a":0.76,"k":0.78,"f":0.86,"d":0.74},"M":{"chi":0.92,"a":0.615,"k":0.745,"f":0.23,"d":0.575},"G":{"chi":0.2025,"a":0.24,"k":0.465,"f":0.735,"d":0.65}},"y":0.76935,"o1":"S_HM","os":"S_HM"},{"id":76,"f":"P","t":"Breaking news with incomplete evidence","x":{"CP_H":0.58,"CP_M":0.67,"TR_H":0.84,"TR_M":0.705,"VA_H":0.895,"VA_M":0.72,"VA_HM":0.8175,"UC_H":0.494,"UC_M":0.36,"ER":0.345,"TC":0.4,"FC":0,"HO":0},"P":{"H":{"chi":0.855,"a":0.775,"k":0.675,"f":0.9,"d":0.9},"M":{"chi":0.76,"a":0.445,"k":0.7425,"f":0.18,"d":0.505},"G":{"chi":0.4625,"a":0.45,"k":0.5925,"f":0.765,"d":0.81}},"y":0.68328,"o1":"S_HM","os":"S_HM"},{"id":77,"f":"P","t":"AI drafts a coherent story from unreliable fragments","x":{"CP_H":0.6475,"CP_M":0.59,"TR_H":0.84,"TR_M":0.69685,"VA_H":0.895,"VA_M":0.7168,"VA_HM":0.7825,"UC_H":0.4265,"UC_M":0.41,"ER":0.345,"TC":0.3,"FC":0,"HO":0},"P":{"H":{"chi":0.85,"a":0.775,"k":0.725,"f":0.9,"d":0.9},"M":{"chi":0.705,"a":0.4402,"k":0.7386,"f":0.18,"d":0.505},"G":{"chi":0.4625,"a":0.45,"k":0.5925,"f":0.765,"d":0.81}},"y":0.57696,"o1":"S_N","os":"S_N"},{"id":78,"f":"P","t":"Known facts but unknown framing risk","x":{"CP_H":0.585,"CP_M":0.67,"TR_H":0.8412,"TR_M":0.705,"VA_H":0.8959,"VA_M":0.72,"VA_HM":0.8175,"UC_H":0.4835,"UC_M":0.36,"ER":0.345,"TC":0.3,"FC":0,"HO":0},"P":{"H":{"chi":0.845,"a":0.825,"k":0.725,"f":0.9,"d":0.9},"M":{"chi":0.81,"a":0.445,"k":0.7425,"f":0.18,"d":0.505},"G":{"chi":0.4625,"a":0.45,"k":0.5925,"f":0.765,"d":0.81}},"y":0.66291,"o1":"S_HM","os":"S_HM"},{"id":79,"f":"P","t":"Source credibility cannot be fully shared with the AI","x":{"CP_H":0.5025,"CP_M":0.63,"TR_H":0.84,"TR_M":0.7018,"VA_H":0.895,"VA_M":0.716,"VA_HM":0.8143,"UC_H":0.515,"UC_M":0.4182,"ER":0.3782,"TC":0.3,"FC":0,"HO":0},"P":{"H":{"chi":0.765,"a":0.775,"k":0.675,"f":0.9,"d":0.9},"M":{"chi":0.755,"a":0.4402,"k":0.7361,"f":0.18,"d":0.505},"G":{"chi":0.4625,"a":0.45,"k":0.5925,"f":0.765,"d":0.81}},"y":0.51633,"o1":"S_HM","os":"S_HM"},{"id":80,"f":"P","t":"AI supports fact-checking triage while final publication stays human-led","x":{"CP_H":0.61,"CP_M":0.71,"TR_H":0.84,"TR_M":0.765,"VA_H":0.895,"VA_M":0.72,"VA_HM":0.8175,"UC_H":0.425,"UC_M":0.33,"ER":0.345,"TC":0.3,"FC":0,"HO":0},"P":{"H":{"chi":0.76,"a":0.775,"k":0.725,"f":0.9,"d":0.9},"M":{"chi":0.92,"a":0.505,"k":0.745,"f":0.18,"d":0.505},"G":{"chi":0.4625,"a":0.45,"k":0.5925,"f":0.765,"d":0.81}},"y":0.75267,"o1":"S_HM","os":"S_HM"},{"id":81,"f":"Q","t":"Known research question but uncertain literature boundary","x":{"CP_H":0.655,"CP_M":0.717,"TR_H":0.8512,"TR_M":0.75,"VA_H":0.8709,"VA_M":0.76,"VA_HM":0.83,"UC_H":0.3875,"UC_M":0.3,"ER":0.25,"TC":0.135,"FC":0,"HO":0},"P":{"H":{"chi":0.975,"a":0.84,"k":0.78,"f":0.88,"d":0.84},"M":{"chi":0.83,"a":0.535,"k":0.7975,"f":0.205,"d":0.555},"G":{"chi":0.355,"a":0.36,"k":0.535,"f":0.75,"d":0.74}},"y":0.72234,"o1":"S_HM","os":"S_HM"},{"id":82,"f":"Q","t":"AI summary misses a seminal source","x":{"CP_H":0.7225,"CP_M":0.72075,"TR_H":0.8512,"TR_M":0.75,"VA_H":0.8709,"VA_M":0.76,"VA_HM":0.83,"UC_H":0.32,"UC_M":0.27,"ER":0.25,"TC":0.135,"FC":0,"HO":0},"P":{"H":{"chi":0.97,"a":0.84,"k":0.83,"f":0.88,"d":0.84},"M":{"chi":0.855,"a":0.535,"k":0.8,"f":0.205,"d":0.555},"G":{"chi":0.355,"a":0.36,"k":0.535,"f":0.75,"d":0.74}},"y":0.77921,"o1":"S_HM","os":"S_HM"},{"id":83,"f":"Q","t":"High-volume review under proposal deadline","x":{"CP_H":0.68,"CP_M":0.7245,"TR_H":0.85,"TR_M":0.75,"VA_H":0.87,"VA_M":0.76,"VA_HM":0.83,"UC_H":0.32,"UC_M":0.27,"ER":0.25,"TC":0.135,"FC":0,"HO":0},"P":{"H":{"chi":0.89,"a":0.79,"k":0.78,"f":0.88,"d":0.84},"M":{"chi":0.88,"a":0.535,"k":0.8,"f":0.205,"d":0.555},"G":{"chi":0.355,"a":0.36,"k":0.535,"f":0.75,"d":0.74}},"y":0.73525,"o1":"S_HM","os":"S_HM"},{"id":84,"f":"Q","t":"Plausible hypothesis generation without sufficient evidential support","x":{"CP_H":0.6275,"CP_M":0.72825,"TR_H":0.85,"TR_M":0.75,"VA_H":0.87,"VA_M":0.76,"VA_HM":0.83,"UC_H":0.35,"UC_M":0.285,"ER":0.25,"TC":0.135,"FC":0,"HO":0},"P":{"H":{"chi":0.835,"a":0.79,"k":0.73,"f":0.88,"d":0.84},"M":{"chi":0.905,"a":0.535,"k":0.7975,"f":0.205,"d":0.555},"G":{"chi":0.355,"a":0.36,"k":0.535,"f":0.75,"d":0.74}},"y":0.68588,"o1":"S_HM","os":"S_HM"},{"id":85,"f":"Q","t":"Screening is delegated but inclusion criteria remain human-governed","x":{"CP_H":0.655,"CP_M":0.732,"TR_H":0.85,"TR_M":0.75,"VA_H":0.87,"VA_M":0.76,"VA_HM":0.83,"UC_H":0.32,"UC_M":0.27,"ER":0.25,"TC":0.135,"FC":0,"HO":0},"P":{"H":{"chi":0.83,"a":0.79,"k":0.78,"f":0.88,"d":0.84},"M":{"chi":0.93,"a":0.535,"k":0.8,"f":0.205,"d":0.555},"G":{"chi":0.355,"a":0.36,"k":0.535,"f":0.75,"d":0.74}},"y":0.7335,"o1":"S_HM","os":"S_HM"},{"id":86,"f":"R","t":"Known investment objective but uncertain market regime","x":{"CP_H":0.565,"CP_M":0.724,"TR_H":0.84,"TR_M":0.735,"VA_H":0.895,"VA_M":0.74,"VA_HM":0.8175,"UC_H":0.454,"UC_M":0.315,"ER":0.345,"TC":0.19,"FC":0,"HO":0},"P":{"H":{"chi":0.855,"a":0.715,"k":0.675,"f":0.86,"d":0.9},"M":{"chi":0.83,"a":0.59,"k":0.7975,"f":0.23,"d":0.59},"G":{"chi":0.4625,"a":0.45,"k":0.5925,"f":0.765,"d":0.81}},"y":0.64472,"o1":"S_HM","os":"S_HM"},{"id":87,"f":"R","t":"Recommended allocation conflicts with client risk tolerance","x":{"CP_H":0.6625,"CP_M":0.7315,"TR_H":0.8412,"TR_M":0.73325,"VA_H":0.8959,"VA_M":0.74,"VA_HM":0.7825,"UC_H":0.385,"UC_M":0.285,"ER":0.345,"TC":0.19,"FC":0,"HO":1},"P":{"H":{"chi":0.9,"a":0.845,"k":0.775,"f":0.94,"d":0.9},"M":{"chi":0.855,"a":0.582,"k":0.8,"f":0.23,"d":0.59},"G":{"chi":0.4705,"a":0.53,"k":0.5925,"f":0.765,"d":0.81}},"y":0.74088,"o1":"S_H","os":"S_H"},{"id":88,"f":"R","t":"Historical signal is disrupted by macroeconomic shock","x":{"CP_H":0.65,"CP_M":0.739,"TR_H":0.8412,"TR_M":0.73325,"VA_H":0.8959,"VA_M":0.74,"VA_HM":0.7825,"UC_H":0.3835,"UC_M":0.285,"ER":0.345,"TC":0.19,"FC":0,"HO":0},"P":{"H":{"chi":0.87,"a":0.765,"k":0.775,"f":0.86,"d":0.9},"M":{"chi":0.88,"a":0.59,"k":0.8,"f":0.23,"d":0.59},"G":{"chi":0.4625,"a":0.45,"k":0.5925,"f":0.765,"d":0.81}},"y":0.74053,"o1":"S_HM","os":"S_HM"},{"id":89,"f":"R","t":"Regulatory constraint blocks the nominally optimal trade","x":{"CP_H":0.6375,"CP_M":0.7465,"TR_H":0.8412,"TR_M":0.73325,"VA_H":0.8959,"VA_M":0.74,"VA_HM":0.7825,"UC_H":0.3835,"UC_M":0.285,"ER":0.345,"TC":0.19,"FC":0,"HO":0},"P":{"H":{"chi":0.84,"a":0.765,"k":0.775,"f":0.86,"d":0.9},"M":{"chi":0.905,"a":0.59,"k":0.8,"f":0.23,"d":0.59},"G":{"chi":0.4625,"a":0.45,"k":0.5925,"f":0.765,"d":0.81}},"y":0.74003,"o1":"S_HM","os":"S_HM"},{"id":90,"f":"R","t":"Routine rebalancing is automated within predefined limits","x":{"CP_H":0.595,"CP_M":0.794,"TR_H":0.84,"TR_M":0.795,"VA_H":0.895,"VA_M":0.74,"VA_HM":0.8175,"UC_H":0.385,"UC_M":0.285,"ER":0.345,"TC":0.19,"FC":0,"HO":0},"P":{"H":{"chi":0.76,"a":0.715,"k":0.725,"f":0.86,"d":0.9},"M":{"chi":0.99,"a":0.65,"k":0.8,"f":0.23,"d":0.59},"G":{"chi":0.4625,"a":0.45,"k":0.5925,"f":0.765,"d":0.81}},"y":0.70913,"o1":"S_N","os":"S_N"},{"id":91,"f":"S","t":"Pollution alert with uncertain source attribution","x":{"CP_H":0.58,"CP_M":0.664,"TR_H":0.855,"TR_M":0.69,"VA_H":0.92,"VA_M":0.7,"VA_HM":0.8175,"UC_H":0.454,"UC_M":0.36,"ER":0.385,"TC":0.19,"FC":0,"HO":0},"P":{"H":{"chi":0.855,"a":0.715,"k":0.675,"f":0.86,"d":0.92},"M":{"chi":0.76,"a":0.555,"k":0.7425,"f":0.23,"d":0.575},"G":{"chi":0.525,"a":0.51,"k":0.6375,"f":0.78,"d":0.86}},"y":0.62787,"o1":"S_HM","os":"S_HM"},{"id":92,"f":"S","t":"Likely violator identified but evidential chain remains incomplete","x":{"CP_H":0.6375,"CP_M":0.6715,"TR_H":0.8562,"TR_M":0.69,"VA_H":0.9209,"VA_M":0.7,"VA_HM":0.8175,"UC_H":0.415,"UC_M":0.345,"ER":0.385,"TC":0.19,"FC":0,"HO":0},"P":{"H":{"chi":0.875,"a":0.765,"k":0.725,"f":0.86,"d":0.92},"M":{"chi":0.785,"a":0.555,"k":0.7425,"f":0.23,"d":0.575},"G":{"chi":0.525,"a":0.51,"k":0.6375,"f":0.78,"d":0.86}},"y":0.67986,"o1":"S_N","os":"S_N"},{"id":93,"f":"S","t":"Rapid prioritization during an unfolding environmental emergency","x":{"CP_H":0.635,"CP_M":0.679,"TR_H":0.855,"TR_M":0.69,"VA_H":0.92,"VA_M":0.7,"VA_HM":0.8175,"UC_H":0.385,"UC_M":0.33,"ER":0.415,"TC":0.34,"FC":0,"HO":0},"P":{"H":{"chi":0.82,"a":0.715,"k":0.725,"f":0.86,"d":0.92},"M":{"chi":0.81,"a":0.555,"k":0.745,"f":0.23,"d":0.575},"G":{"chi":0.525,"a":0.51,"k":0.6375,"f":0.78,"d":0.86}},"y":0.66858,"o1":"S_N","os":"S_N"},{"id":94,"f":"S","t":"Detection efficiency conflicts with environmental justice concerns","x":{"CP_H":0.6225,"CP_M":0.6865,"TR_H":0.855,"TR_M":0.6865,"VA_H":0.92,"VA_M":0.6975,"VA_HM":0.745,"UC_H":0.385,"UC_M":0.33,"ER":0.44,"TC":0.19,"FC":1,"HO":0},"P":{"H":{"chi":0.79,"a":0.775,"k":0.725,"f":0.86,"d":0.92},"M":{"chi":0.835,"a":0.5502,"k":0.745,"f":0.23,"d":0.575},"G":{"chi":0.5298,"a":0.51,"k":0.6375,"f":0.78,"d":0.86}},"y":0.61761,"o1":"S_H","os":"S_H"},{"id":95,"f":"S","t":"Routine monitoring is automated but enforcement escalation is human-led","x":{"CP_H":0.61,"CP_M":0.734,"TR_H":0.855,"TR_M":0.75,"VA_H":0.92,"VA_M":0.7,"VA_HM":0.8175,"UC_H":0.385,"UC_M":0.33,"ER":0.385,"TC":0.19,"FC":0,"HO":0},"P":{"H":{"chi":0.76,"a":0.715,"k":0.725,"f":0.86,"d":0.92},"M":{"chi":0.92,"a":0.615,"k":0.745,"f":0.23,"d":0.575},"G":{"chi":0.525,"a":0.51,"k":0.6375,"f":0.78,"d":0.86}},"y":0.69227,"o1":"S_HM","os":"S_HM"},{"id":96,"f":"T","t":"Routine inquiry becomes an ambiguous service case","x":{"CP_H":0.58,"CP_M":0.661,"TR_H":0.825,"TR_M":0.72,"VA_H":0.87,"VA_M":0.74,"VA_HM":0.8175,"UC_H":0.474,"UC_M":0.33,"ER":0.195,"TC":0.245,"FC":0,"HO":0},"P":{"H":{"chi":0.855,"a":0.685,"k":0.675,"f":0.84,"d":0.8},"M":{"chi":0.76,"a":0.61,"k":0.7425,"f":0.255,"d":0.61},"G":{"chi":0.31,"a":0.33,"k":0.5225,"f":0.75,"d":0.72}},"y":0.65077,"o1":"S_HM","os":"S_HM"},{"id":97,"f":"T","t":"AI marks the case resolved but customer sentiment remains negative","x":{"CP_H":0.6775,"CP_M":0.67225,"TR_H":0.8262,"TR_M":0.72,"VA_H":0.8709,"VA_M":0.74,"VA_HM":0.8175,"UC_H":0.405,"UC_M":0.3,"ER":0.195,"TC":0.245,"FC":0,"HO":0},"P":{"H":{"chi":0.9,"a":0.735,"k":0.775,"f":0.84,"d":0.8},"M":{"chi":0.785,"a":0.61,"k":0.745,"f":0.255,"d":0.61},"G":{"chi":0.31,"a":0.33,"k":0.5225,"f":0.75,"d":0.72}},"y":0.75164,"o1":"S_HM","os":"S_HM"},{"id":98,"f":"T","t":"Policy-compliant answer lacks contextual empathy","x":{"CP_H":0.635,"CP_M":0.6835,"TR_H":0.825,"TR_M":0.72,"VA_H":0.87,"VA_M":0.74,"VA_HM":0.8175,"UC_H":0.405,"UC_M":0.3,"ER":0.195,"TC":0.245,"FC":0,"HO":1},"P":{"H":{"chi":0.82,"a":0.765,"k":0.725,"f":0.92,"d":0.8},"M":{"chi":0.81,"a":0.602,"k":0.745,"f":0.255,"d":0.61},"G":{"chi":0.318,"a":0.41,"k":0.5225,"f":0.75,"d":0.72}},"y":0.70842,"o1":"S_H","os":"S_H"},{"id":99,"f":"T","t":"Sensitive financial or identity issue cannot be fully delegated","x":{"CP_H":0.5825,"CP_M":0.69475,"TR_H":0.825,"TR_M":0.72,"VA_H":0.87,"VA_M":0.74,"VA_HM":0.8175,"UC_H":0.435,"UC_M":0.315,"ER":0.195,"TC":0.245,"FC":0,"HO":0},"P":{"H":{"chi":0.765,"a":0.685,"k":0.675,"f":0.84,"d":0.8},"M":{"chi":0.835,"a":0.61,"k":0.7425,"f":0.255,"d":0.61},"G":{"chi":0.31,"a":0.33,"k":0.5225,"f":0.75,"d":0.72}},"y":0.7298,"o1":"S_HM","os":"S_HM"},{"id":100,"f":"T","t":"Autonomous replies operate within predefined service boundaries","x":{"CP_H":0.61,"CP_M":0.746,"TR_H":0.825,"TR_M":0.78,"VA_H":0.87,"VA_M":0.74,"VA_HM":0.8175,"UC_H":0.405,"UC_M":0.3,"ER":0.195,"TC":0.245,"FC":0,"HO":0},"P":{"H":{"chi":0.76,"a":0.685,"k":0.725,"f":0.84,"d":0.8},"M":{"chi":0.92,"a":0.67,"k":0.745,"f":0.255,"d":0.61},"G":{"chi":0.31,"a":0.33,"k":0.5225,"f":0.75,"d":0.72}},"y":0.71668,"o1":"S_HM","os":"S_HM"}];
+
+</script>
+<script>
+(function(){
+'use strict';
+var M = MCSM;
+var $ = function(id){ return document.getElementById(id); };
+var fmt = function(v, d){ return (v < 0 ? '−' : '') + Math.abs(v).toFixed(d == null ? 3 : d); };
+var SHORT = { S_H:'S<sub>H</sub>', S_HtoM:'S<sub>H→M</sub>', S_M:'S<sub>M</sub>', S_MtoH:'S<sub>M→H</sub>', S_HM:'S<sub>HM</sub>', S_N:'S<sub>N</sub>' };
+var TXT = { S_H:'S_H', S_HtoM:'S_H→M', S_M:'S_M', S_MtoH:'S_M→H', S_HM:'S_HM', S_N:'S_N' };
+var SCOL = { S_H:'var(--st-H)', S_HtoM:'var(--st-Hs)', S_M:'var(--st-M)', S_MtoH:'var(--st-Ms)', S_HM:'var(--st-HM)', S_N:'var(--st-N)' };
+var SINK = { S_H:'var(--panel)', S_HtoM:'var(--ink)', S_M:'var(--panel)', S_MtoH:'var(--ink)', S_HM:'var(--panel)', S_N:'var(--panel)' };
+
+var INPUT_META = {
+  CP_H:['capability'], TR_H:['trustworthiness'], VA_H:['value alignment'], UC_H:['uncertainty'],
+  CP_M:['capability'], TR_M:['trustworthiness'], VA_M:['value alignment'], UC_M:['uncertainty'],
+  VA_HM:['joint value alignment, compared with τ'], ER:['ethical risk, compared with ρ'], TC:['time criticality, compared with κ']
+};
+function mathLabel(k){ var a=k.split('_'); return a[0]+'<sub>'+a[1]+'</sub>'; }
+
+var EXAMPLES = [
+  { name:'Machine advantage (H → M handover)', q:'S_H', note:'Δ above θM from a human-led start: the handover request is logged before machine-led control.',
+    x:{CP_H:.70,TR_H:.80,VA_H:.85,UC_H:.30,CP_M:.95,TR_M:.90,VA_M:.80,UC_M:.10,VA_HM:.70,ER:.30,TC:.40,FC:0,HO:0} },
+  { name:'Shared control', q:'S_N', note:'|Δ| inside the ε band with joint value alignment above τ.',
+    x:{CP_H:.70,TR_H:.80,VA_H:.85,UC_H:.30,CP_M:.80,TR_M:.80,VA_M:.80,UC_M:.20,VA_HM:.70,ER:.30,TC:.40,FC:0,HO:0} },
+  { name:'Dead band (no rule fires)', q:'S_H', note:'Δ between ε and θM: no allocation rule applies, so the published rule falls through to negotiation.',
+    x:{CP_H:.70,TR_H:.80,VA_H:.85,UC_H:.30,CP_M:.85,TR_M:.85,VA_M:.80,UC_M:.15,VA_HM:.70,ER:.30,TC:.40,FC:0,HO:0} },
+  { name:'Human override active', q:'S_M', note:'HO = 1 forces human-led control from any state.',
+    x:{CP_H:.70,TR_H:.80,VA_H:.85,UC_H:.30,CP_M:.95,TR_M:.90,VA_M:.80,UC_M:.10,VA_HM:.70,ER:.30,TC:.40,FC:0,HO:1} },
+  { name:'High ethical risk', q:'S_H', note:'ER ≥ ρ excludes machine-led control even with a clear machine advantage.',
+    x:{CP_H:.70,TR_H:.80,VA_H:.85,UC_H:.30,CP_M:.95,TR_M:.90,VA_M:.80,UC_M:.10,VA_HM:.70,ER:.80,TC:.40,FC:0,HO:0} },
+  { name:'Time-critical, ambiguous', q:'S_H', note:'The published rule returns S_N, which constraint (7) excludes. Switch policy modes to compare.',
+    x:{CP_H:.70,TR_H:.80,VA_H:.85,UC_H:.30,CP_M:.80,TR_M:.90,VA_M:.70,UC_M:.10,VA_HM:.70,ER:.30,TC:.90,FC:0,HO:0} },
+  { name:'Time-critical, machine advantage', q:'S_H', note:'Line 6 returns the handover state S_H→M, which constraint (7) excludes.',
+    x:{CP_H:.70,TR_H:.80,VA_H:.85,UC_H:.30,CP_M:.95,TR_M:.90,VA_M:.80,UC_M:.10,VA_HM:.70,ER:.30,TC:.90,FC:0,HO:0} }
+];
+
+var S = {
+  mode:'literal', x:M.clone(EXAMPLES[0].x), q:EXAMPLES[0].q, p:M.clone(M.DEFAULT_PARAMS),
+  presets:M.clone(M.RESP_PRESETS), respState:'S_HtoM', respFollow:true, y:0.80,
+  log:[], tab:'epoch',
+  p3:{ kind:'silent', q0:'S_M', T:24, onset:6, duration:6, magnitude:.65, humanLoss:.20, lag:3 }
+};
+
+/* ---------- tabs ---------- */
+var TABS = ['epoch','roll','resp','scen','p3','par'];
+function showTab(t){
+  S.tab = t;
+  TABS.forEach(function(k){ $('tab-'+k).setAttribute('aria-selected', k===t ? 'true':'false'); $('pane-'+k).hidden = k!==t; });
+  try{ localStorage.setItem('mcsm-tab', t); }catch(e){}
+  render();
+}
+TABS.forEach(function(k){ $('tab-'+k).addEventListener('click', function(){ showTab(k); }); });
+
+/* ---------- mode ---------- */
+var MODE_NOTE = {
+  literal:'The transition rule exactly as published in the paper. If it selects a state that the constraints forbid, the result is shown with a warning instead of being corrected.',
+  enforced:'The published rule, with any excluded result replaced by S_H.',
+  eq8:'Stateless summary policy; ignores q_t and the handover states.',
+  revised:'Admissibility-preserving rule: never leaves A(x_t); S_N and S_HM can exit; interrupted handovers reverse.'
+};
+Array.prototype.forEach.call($('modeSeg').querySelectorAll('button'), function(b){
+  b.addEventListener('click', function(){
+    S.mode = b.getAttribute('data-mode');
+    Array.prototype.forEach.call($('modeSeg').querySelectorAll('button'), function(o){ o.setAttribute('aria-pressed', o===b ? 'true':'false'); });
+    render();
+  });
+});
+
+$('deadBandSel').addEventListener('change', function(){ S.p.deadBand=this.value; render(); });
+/* ---------- inputs ---------- */
+function sliderRow(parent, key, label, desc, get, set, min, max, step){
+  var row = document.createElement('div'); row.className='srow';
+  var id = 'in-'+key;
+  row.innerHTML = '<label for="'+id+'">'+label+'</label><input type="range" id="'+id+'" min="'+(min||0)+'" max="'+(max||1)+'" step="'+(step||0.01)+'"><output id="out-'+key+'"></output>'+(desc?'<span class="desc">'+desc+'</span>':'');
+  parent.appendChild(row);
+  var inp = row.querySelector('input'), out = row.querySelector('output');
+  inp.addEventListener('input', function(){ set(parseFloat(inp.value)); render(); });
+  return { sync:function(){ var v=get(); inp.value=v; out.textContent = (step && step>=1) ? String(v) : v.toFixed(2); } };
+}
+var syncers = [];
+['CP_H','TR_H','VA_H','UC_H'].forEach(function(k){ syncers.push(sliderRow($('g-H'),k,mathLabel(k),INPUT_META[k][0],function(){return S.x[k];},function(v){S.x[k]=v;})); });
+['CP_M','TR_M','VA_M','UC_M'].forEach(function(k){ syncers.push(sliderRow($('g-M'),k,mathLabel(k),INPUT_META[k][0],function(){return S.x[k];},function(v){S.x[k]=v;})); });
+['VA_HM','ER','TC'].forEach(function(k){ syncers.push(sliderRow($('g-G'),k,k==='VA_HM'?'VA<sub>HM</sub>':k,INPUT_META[k][0],function(){return S.x[k];},function(v){S.x[k]=v;})); });
+['FC','HO'].forEach(function(k){ $('in-'+k).addEventListener('change', function(){ S.x[k] = this.checked ? 1 : 0; render(); }); });
+
+EXAMPLES.forEach(function(e,i){ var o=document.createElement('option'); o.value=i; o.textContent=e.name; $('exampleSel').appendChild(o); });
+var cust=document.createElement('option'); cust.value='custom'; cust.textContent='Custom (edited)'; $('exampleSel').appendChild(cust);
+$('exampleSel').addEventListener('change', function(){
+  if (this.value==='custom') return;
+  var e = EXAMPLES[+this.value]; S.x = M.clone(e.x); S.q = e.q; render();
+});
+function fillStateSelect(sel){ M.STATES.forEach(function(s){ var o=document.createElement('option'); o.value=s; o.textContent=TXT[s]+' — '+M.STATE_LABEL[s]; sel.appendChild(o); }); }
+fillStateSelect($('qSel')); fillStateSelect($('respState')); fillStateSelect($('p-q0'));
+$('qSel').addEventListener('change', function(){ S.q=this.value; render(); });
+
+/* ---------- SVG helpers ---------- */
+var NS='http://www.w3.org/2000/svg';
+function el(tag, attrs, parent, text){ var e=document.createElementNS(NS,tag); for (var k in attrs) e.setAttribute(k, attrs[k]); if (text!=null) e.textContent=text; if (parent) parent.appendChild(e); return e; }
+function clear(svg){ while(svg.firstChild) svg.removeChild(svg.firstChild); }
+function sub(parent, main, s, attrs){ var t=el('text', attrs, parent); var a=el('tspan',{},t,main); if (s){ el('tspan',{'baseline-shift':'sub','font-size':'0.72em'},t,s); } return t; }
+
+/* ---------- Δ ruler ---------- */
+function drawRuler(d){
+  var svg=$('ruler'); clear(svg);
+  var p=S.p, x0=30, x1=570, lo=-0.5, hi=0.5;
+  var X=function(v){ return x0 + (Math.max(lo,Math.min(hi,v))-lo)/(hi-lo)*(x1-x0); };
+  var y=34, h=18;
+  var zones=[[lo,-p.thetaH,'var(--st-H)','human advantage'],[-p.thetaH,-p.eps,'var(--st-Ns)',''],[-p.eps,p.eps,'var(--st-HM)','shared'],[p.eps,p.thetaM,'var(--st-Ns)',''],[p.thetaM,hi,'var(--st-M)','machine advantage']];
+  zones.forEach(function(z){ if (z[1]<=z[0]) return; el('rect',{x:X(z[0]),y:y,width:Math.max(0,X(z[1])-X(z[0])),height:h,fill:z[2],opacity:z[2].indexOf('Ns')>0?1:0.85},svg); });
+  el('text',{x:X(lo)+6,y:y+13,'font-size':11,fill:'var(--panel)'},svg,'human advantage → S_H');
+  el('text',{x:X(hi)-6,y:y+13,'font-size':11,'text-anchor':'end',fill:'var(--panel)'},svg,'S_M ← machine advantage');
+  // ticks
+  [[-p.thetaH,'−θH','b'],[-p.eps,'−ε','t'],[0,'0','b'],[p.eps,'ε','t'],[p.thetaM,'θM','b']].forEach(function(tk){
+    var xx=X(tk[0]); el('line',{x1:xx,x2:xx,y1:y-4,y2:y+h+4,stroke:'var(--ink)','stroke-width':1},svg);
+    var ty = tk[2]==='t' ? y-8 : y+h+16;
+    el('text',{x:xx,y:ty,'font-size':11.5,'text-anchor':'middle',class:'mt',fill:'var(--muted)'},svg,tk[1]);
+  });
+  el('text',{x:x1,y:y+h+34,'font-size':10.5,'text-anchor':'end',class:'mt',fill:'var(--muted)'},svg,'θH = '+p.thetaH.toFixed(2)+' · ε = '+p.eps.toFixed(2)+' · θM = '+p.thetaM.toFixed(2));
+  el('text',{x:x0,y:y+h+34,'font-size':10.5,fill:'var(--muted)'},svg,'pale bands: no allocation rule → S_N');
+  // marker
+  var mx=X(d); el('path',{d:'M'+mx+' '+(y-2)+' l-6 -9 h12 z',fill:'var(--ink)'},svg);
+  el('line',{x1:mx,x2:mx,y1:y,y2:y+h,stroke:'var(--ink)','stroke-width':2.5},svg);
+  if (d<lo||d>hi) el('text',{x:mx,y:y-14,'font-size':10.5,'text-anchor':'middle'},svg,'off scale');
+}
+
+/* ---------- state graph ---------- */
+// Layout: S_N in the centre, the H/M handover ring around it, S_HM bottom-left.
+var POS={ S_H:[80,150], S_HtoM:[300,42], S_M:[520,150], S_MtoH:[300,262], S_N:[300,150], S_HM:[96,262] };
+var BW=124, BH=44;
+// Every transition the published rule can produce outside line 3 (verified by enumerating the rule).
+// Every transition the active policy can make outside the governance line, found by enumeration.
+function policyEdges(){
+  var seen={}, out=[], v={CP_H:.5,TR_H:.5,VA_H:.5,UC_H:.5,CP_M:.5,TR_M:.5,VA_M:.5,UC_M:.5,ER:0,FC:0,HO:0};
+  [{VA_HM:1,TC:0},{VA_HM:1,TC:1},{VA_HM:0,TC:0},{VA_HM:0,TC:1}].forEach(function(sig){
+    var x=Object.assign({},v,sig), tm=M.transitionMap(x,S.p,S.mode);
+    tm.rows.forEach(function(r){ r.cells.forEach(function(c){ var k=r.q+'>'+c.next; if (c.next!==r.q && !c.gov && !seen[k]){ seen[k]=1; out.push([r.q,c.next]); } }); });
+  });
+  return out;
+}
+function inBox(px,py,s,pad){ var c=POS[s]; return Math.abs(px-c[0])<BW/2+pad && Math.abs(py-c[1])<BH/2+pad; }
+function clipRect(cx,cy,tx,ty){ var dx=tx-cx, dy=ty-cy; var kx=dx!==0?(BW/2+5)/Math.abs(dx):Infinity, ky=dy!==0?(BH/2+5)/Math.abs(dy):Infinity; var k=Math.min(kx,ky,1); return [cx+dx*k, cy+dy*k]; }
+function edgePath(a,b,extraBow){
+  var A=POS[a], B=POS[b], mx=(A[0]+B[0])/2, my=(A[1]+B[1])/2, dx=B[0]-A[0], dy=B[1]-A[1], L=Math.hypot(dx,dy), nx=-dy/L, ny=dx/L;
+  function hits(bow){ var cx=mx+nx*bow, cy=my+ny*bow;
+    for (var i=1;i<20;i++){ var t=i/20, px=(1-t)*(1-t)*A[0]+2*(1-t)*t*cx+t*t*B[0], py=(1-t)*(1-t)*A[1]+2*(1-t)*t*cy+t*t*B[1];
+      for (var s in POS){ if (s!==a && s!==b && inBox(px,py,s,4)) return true; } } return false; }
+  var bow=extraBow||0;
+  if (hits(bow)){ var cands=[45,-45,80,-80,120,-120]; for (var j=0;j<cands.length;j++){ if (!hits(bow+cands[j])){ bow+=cands[j]; break; } } }
+  var cx=mx+nx*bow, cy=my+ny*bow, s0=clipRect(A[0],A[1],cx,cy), e0=clipRect(B[0],B[1],cx,cy);
+  return 'M'+s0[0].toFixed(1)+' '+s0[1].toFixed(1)+' Q'+cx.toFixed(1)+' '+cy.toFixed(1)+' '+e0[0].toFixed(1)+' '+e0[1].toFixed(1);
+}
+var EDGES=[];
+function pairBow(a,b){ for (var i=0;i<EDGES.length;i++){ if (EDGES[i][0]===b && EDGES[i][1]===a) return 14; } return 0; }
+function drawGraph(res){
+  var svg=$('graph'); clear(svg);
+  var defs=el('defs',{},svg);
+  ['base','hit','bad'].forEach(function(k){ var m=el('marker',{id:'ar-'+k,viewBox:'0 0 10 10',refX:9,refY:5,markerWidth:k==='base'?6:7,markerHeight:k==='base'?6:7,orient:'auto-start-reverse'},defs);
+    el('path',{d:'M0 0 L10 5 L0 10 z',fill:k==='base'?'var(--line-strong)':(k==='bad'?'var(--warn)':'var(--accent)')},m); });
+  EDGES=policyEdges();
+  EDGES.forEach(function(e){ el('path',{d:edgePath(e[0],e[1],pairBow(e[0],e[1])),fill:'none',stroke:'var(--line-strong)','stroke-width':1.1,'marker-end':'url(#ar-base)'},svg); });
+  if (res.q!==res.next){
+    var k=res.violation&&S.mode==='literal'?'bad':'hit';
+    el('path',{d:edgePath(res.q,res.next,pairBow(res.q,res.next)),fill:'none',stroke:k==='bad'?'var(--warn)':'var(--accent)','stroke-width':3,'stroke-dasharray':res.gov?'7 4':'none','marker-end':'url(#ar-'+k+')'},svg);
+  }
+  M.STATES.forEach(function(s){
+    var cx=POS[s][0], cy=POS[s][1], g=el('g',{},svg);
+    var excluded=!res.A.has(s), isNext=s===res.next, isCur=s===res.q;
+    el('rect',{x:cx-BW/2,y:cy-BH/2,width:BW,height:BH,rx:7,fill:isNext?SCOL[s]:'var(--panel)',stroke:isNext?SCOL[s]:'var(--line-strong)','stroke-width':isNext?2:1,opacity:excluded&&!isNext?0.45:1},g);
+    if (isCur) el('rect',{x:cx-BW/2-5,y:cy-BH/2-5,width:BW+10,height:BH+10,rx:10,fill:'none',stroke:'var(--ink)','stroke-width':1.5,'stroke-dasharray':'5 4'},g);
+    var col = isNext ? SINK[s] : 'var(--ink)';
+    var t=el('text',{x:cx,y:cy-2,'text-anchor':'middle','font-size':15,'font-weight':600,fill:col},g); el('tspan',{},t,'S'); el('tspan',{'baseline-shift':'sub','font-size':'0.72em'},t,TXT[s].replace('S_',''));
+    el('text',{x:cx,y:cy+15,'text-anchor':'middle','font-size':10.5,fill:col},g, M.STATE_LABEL[s].replace(' (H→M)','').replace(' (M→H)',''));
+    if (excluded){ el('line',{x1:cx-BW/2+8,y1:cy+BH/2-6,x2:cx+BW/2-8,y2:cy-BH/2+6,stroke:'var(--warn)','stroke-width':1.5},g); }
+  });
+  if (res.q===res.next){ var c=POS[res.q]; el('text',{x:c[0],y:c[1]-BH/2-10,'text-anchor':'middle','font-size':11,fill:'var(--accent)'},svg,'↻ stays'); }
+  el('text',{x:590,y:302,'text-anchor':'end','font-size':10.5,fill:'var(--muted)'},svg,'Not drawn: the governance line sends states to S_H when HO = 1, ER ≥ ρ or FC = 1.');
+}
+
+/* ---------- algorithm listing ---------- */
+var ALG=[
+ '1:  Compute S_H(t), S_M(t), Δ(t) = S_M(t) − S_H(t)',
+ '2:  Build A(x_t) using (4)–(7)',
+ '3:  if HO(t) = 1 or ER(t) ≥ ρ or FC(t) = 1 then',
+ '4:      q_t+1 ← S_H',
+ '5:  else if q_t = S_H and Δ(t) ≥ θ_M and S_M ∈ A(x_t) then',
+ '6:      q_t+1 ← S_H→M',
+ '7:  else if q_t ∈ {S_M, S_H→M} and Δ(t) ≥ θ_M and S_M ∈ A(x_t) then',
+ '8:      q_t+1 ← S_M',
+ '9:  else if q_t = S_M and Δ(t) ≤ −θ_H then',
+ '10:     q_t+1 ← S_M→H',
+ '11: else if q_t ∈ {S_H, S_M→H} and Δ(t) ≤ −θ_H then',
+ '12:     q_t+1 ← S_H',
+ '13: else if |Δ(t)| < ε and VA_HM(t) ≥ τ and S_HM ∈ A(x_t) then',
+ '14:     q_t+1 ← S_HM',
+ '15: else',
+ '16:     q_t+1 ← S_N',
+ '17: end if',
+ '18: Compute ψ_i(t) = χ_i(t) / Σ_j χ_j(t)',
+ '19: Allocate r_i+(t), r_i−(t), R_i(t) using (10)–(12)'
+];
+var ALG_R=[
+ '1:  Compute S_H(t), S_M(t), Δ(t) = S_M(t) − S_H(t)',
+ '2:  Build A(x_t) using (4)–(7)',
+ '3:  if HO(t) = 1 or ER(t) ≥ ρ or FC(t) = 1 then',
+ '4:      q_t+1 ← S_M→H if q_t = S_M and S_M→H ∈ A(x_t), else S_H',
+ '5:  else if Δ(t) ≥ θ_M and S_M ∈ A(x_t) then',
+ '6:      if q_t ∈ {S_M, S_H→M, S_M→H} then q_t+1 ← S_M',
+ '7:      else if S_H→M ∈ A(x_t) then q_t+1 ← S_H→M',
+ '8:      else q_t+1 ← S_M              ▹ TC ≥ κ leaves no time for a handover state',
+ '9:  else if Δ(t) ≤ −θ_H then',
+ '10:     if q_t = S_M and S_M→H ∈ A(x_t) then q_t+1 ← S_M→H',
+ '11:     else q_t+1 ← S_H              ▹ also cancels S_H→M and exits S_HM, S_N',
+ '12: else if |Δ(t)| < ε and VA_HM(t) ≥ τ and S_HM ∈ A(x_t) then',
+ '13:     q_t+1 ← S_HM',
+ '14: else                              ▹ no allocation rule applies',
+ '15:     [negotiate] q_t+1 ← S_N if S_N ∈ A(x_t); else keep a stable admissible q_t; else S_H',
+ '16:     [hold] keep a stable admissible q_t; S_N stays S_N if admissible; else S_H',
+ '17: end if',
+ '18: Compute ψ_i(t) = χ_i(t) / Σ_j χ_j(t)',
+ '19: Allocate r_i+(t), r_i−(t), R_i(t) using (10)–(12)'
+];
+var R_COND={4:3,6:5,7:5,8:5,10:9,11:9,13:12,15:14,16:14};
+var EQ8=[
+ 'S_H    if HO = 1 or ER ≥ ρ or FC = 1',
+ 'S_M    if Δ ≥ θ_M and S_M ∈ A(x_t)',
+ 'S_HM   if |Δ| < ε, VA_HM ≥ τ, S_HM ∈ A(x_t)',
+ 'S_H    if Δ ≤ −θ_H',
+ 'S_N    otherwise'
+];
+function drawAlgo(res){
+  var box=$('algo'); box.innerHTML='';
+  var bad = res.violation && S.mode!=='enforced';
+  if (S.mode==='eq8'){
+    $('algoTitle').textContent='Compact rule — case that fired';
+    var hit=parseInt(String(res.line).split(':')[1],10);
+    EQ8.forEach(function(l,i){ var d=document.createElement('div'); d.innerHTML='<span class="ln">'+(i+1)+'</span>'+l.replace(/[<>&]/g,function(c){return {'<':'&lt;','>':'&gt;','&':'&amp;'}[c];}); if (i+1===hit) d.className='hit'+(bad?' bad':''); box.appendChild(d); });
+    return;
+  }
+  if (S.mode==='revised'){
+    $('algoTitle').textContent='Admissibility-preserving rule — line that fired';
+    var off = (S.p.deadBand||'negotiate')==='negotiate' ? 16 : 15;
+    ALG_R.forEach(function(l){
+      var n=parseInt(l,10), d=document.createElement('div');
+      d.innerHTML='<span class="ln">'+n+'</span>'+l.replace(/^\d+:\s?/,'').replace(/[<>&]/g,function(c){return {'<':'&lt;','>':'&gt;','&':'&amp;'}[c];});
+      if (n===res.line || n===R_COND[res.line]) d.className='hit';
+      else if (n===off) d.style.opacity='0.5';
+      box.appendChild(d);
+    });
+    return;
+  }
+  $('algoTitle').textContent='Published rule — line that fired';
+  ALG.forEach(function(l){
+    var n=parseInt(l,10), d=document.createElement('div');
+    var body=l.replace(/^\d+:\s?/,'').replace(/[<>&]/g,function(c){return {'<':'&lt;','>':'&gt;','&':'&amp;'}[c];});
+    d.innerHTML='<span class="ln">'+n+'</span>'+body;
+    if (n===res.line || n===res.line+1) d.className='hit'+(bad&&n===res.line+1?' bad':'');
+    box.appendChild(d);
+  });
+}
+
+/* ---------- plain-language reason for the rule that fired ---------- */
+function ruleReason(mode, r){
+  var l=r.line, n=r.next, q=r.q;
+  if (mode==='eq8'){
+    return {'eq8:1':'Safety override (HO, ER or FC)','eq8:2':'Machine stronger: machine leads','eq8:3':'Strengths balanced: shared control','eq8:4':'Human stronger: human leads','eq8:5':'No rule applies: negotiation'}[l];
+  }
+  if (mode==='revised'){
+    if (l===4) return n==='S_MtoH' ? 'Safety override: logged return to human' : 'Safety override (HO, ER or FC)';
+    if (l===15) return n==='S_N' ? 'No rule applies: negotiation' : 'No rule applies: current state held';
+    if (l===16) return n===q ? 'No rule applies: current state held' : (n==='S_N' ? 'No rule applies: negotiation continues' : 'No rule applies: return to human');
+    return {6:'Machine stronger: machine leads',7:'Machine stronger: handover requested',8:'Machine stronger: direct transfer under time pressure',10:'Human stronger: return requested',11:'Human stronger: human leads',13:'Strengths balanced: shared control'}[l];
+  }
+  return {3:'Safety override (HO, ER or FC)',5:'Machine stronger: handover requested',7:'Machine stronger: machine leads',9:'Human stronger: return requested',11:'Human stronger: human leads',13:'Strengths balanced: shared control',15:'No rule applies: negotiation'}[l];
+}
+
+/* ---------- epoch render ---------- */
+var EXCL_HINT = { '(4) HO = 1':'HO = 1', '(6) VA_HM < τ':'VA_HM < τ', '(7) TC ≥ κ':'TC ≥ κ' };
+function renderEpoch(res){
+  $('o-SH').textContent=res.SH.toFixed(3); $('o-SM').textContent=res.SM.toFixed(3); $('o-D').textContent=fmt(res.delta);
+  drawRuler(res.delta);
+  $('o-next').innerHTML=SHORT[res.next]+' <span class="muted" style="font-size:15px;font-family:var(--body);font-weight:400">'+M.STATE_LABEL[res.next]+'</span>';
+  $('verdict').style.borderColor = res.violation && S.mode!=='enforced' ? 'var(--warn)' : SCOL[res.next];
+  var tags=[];
+  tags.push('<span class="pill">'+ruleReason(S.mode,res)+'</span>');
+  tags.push('<span class="pill">from '+TXT[res.q]+'</span>');
+  if (res.fallback) tags.push('<span class="pill bad">fallback to S_H</span>');
+  else if (res.violation) tags.push('<span class="pill bad">result not admissible</span>');
+  else tags.push('<span class="pill good">admissible</span>');
+  $('o-tags').innerHTML=tags.join('');
+  var al=$('o-alert');
+  if (res.violation){
+    var wanted = res.fallback ? (S.mode==='enforced' ? M.step(res.q,S.x,S.p,'literal').next : res.next) : res.next;
+    var why = (res.A.excluded[wanted]||[]).join('; ');
+    al.hidden=false;
+    al.innerHTML = res.fallback
+      ? 'The published rule would return <b>'+SHORT[wanted]+'</b>, which constraint '+why+' excludes. Human-fallback mode replaces it with '+SHORT.S_H+'.'
+      : 'The policy returns <b>'+SHORT[res.next]+'</b>, but constraint '+why+' excludes it from A(x<sub>t</sub>). The paper does not say what should happen here.';
+  } else al.hidden=true;
+  drawGraph(res);
+  $('chips').innerHTML = M.STATES.map(function(s){
+    var ex=res.A.excluded[s];
+    return '<div class="chip'+(ex?' out':'')+'"><b>'+TXT[s]+'</b><span class="muted">'+M.STATE_LABEL[s]+'</span>'+(ex?'<span class="why">✕ '+ex.join(', ')+'</span>':'<span class="small" style="color:var(--ok)">admissible</span>')+'</div>';
+  }).join('');
+  drawAlgo(res);
+  var sens=M.sensitivity(S.q,S.x,S.p,S.mode);
+  $('sensSummary').innerHTML = sens.flips.length===0
+    ? 'All '+sens.n+' one-at-a-time changes keep the next state at <b>'+TXT[sens.base]+'</b>.'
+    : '<b>'+sens.flips.length+' of '+sens.n+'</b> one-at-a-time changes move the next state away from <b>'+TXT[sens.base]+'</b>.';
+  $('sensTable').innerHTML = sens.flips.length ? '<thead><tr><th>Change</th><th>New next state</th></tr></thead><tbody>'+sens.flips.map(function(f){return '<tr><td class="mono">'+f.label+'</td><td>'+SHORT[f.to]+' '+M.STATE_LABEL[f.to]+'</td></tr>';}).join('')+'</tbody>' : '';
+}
+
+/* ---------- rollout & log ---------- */
+function admStr(A){ return A.set.map(function(s){return TXT[s];}).join(', '); }
+function renderRoll(){
+  $('rollStart').textContent=TXT[S.q];
+  var ro=M.rollout(S.q,S.x,S.p,S.mode,20);
+  $('rollResult').innerHTML = ro.stable ? 'stabilises at <b>'+SHORT[ro.final]+'</b> after '+ro.trace.length+' epoch'+(ro.trace.length>1?'s':'') : (ro.cycle?'enters a cycle ending at '+SHORT[ro.final]:'no fixed point within 20 epochs');
+  $('rollTable').innerHTML='<thead><tr><th>t</th><th>q<sub>t</sub></th><th class="n">Δ</th><th>A(x<sub>t</sub>)</th><th>Reason</th><th>q<sub>t+1</sub></th><th>Flag</th></tr></thead><tbody>'+
+    ro.trace.map(function(r){ return '<tr><td class="n">'+r.t+'</td><td>'+SHORT[r.q]+'</td><td class="n">'+fmt(r.delta)+'</td><td class="mono small">'+admStr(r.A)+'</td><td class="small" style="white-space:normal">'+ruleReason(S.mode,r)+'</td><td><span class="sw" style="background:'+SCOL[r.next]+'"></span>'+SHORT[r.next]+'</td><td>'+(r.fallback?'<span class="pill bad">fallback</span>':(r.violation?'<span class="pill bad">not admissible</span>':''))+'</td></tr>'; }).join('')+'</tbody>';
+  renderTmap();
+  renderLog();
+}
+function renderTmap(){
+  var tm=M.transitionMap(S.x,S.p,S.mode);
+  $('tmapTable').innerHTML='<thead><tr><th>q<sub>t</sub></th>'+tm.regions.map(function(r){return '<th>'+r.label.replace(/θH/g,'θ<sub>H</sub>').replace(/θM/g,'θ<sub>M</sub>')+'</th>';}).join('')+'</tr></thead><tbody>'+
+    tm.rows.map(function(row){ return '<tr><td>'+SHORT[row.q]+'</td>'+row.cells.map(function(c){ var bad=c.violation&&S.mode!=='enforced'; return '<td style="'+(bad?'background:var(--warn-soft)':'')+'"><span class="sw" style="background:'+SCOL[c.next]+'"></span>'+SHORT[c.next]+(c.fallback?' <span class="small muted">(fallback)</span>':'')+(bad?' <span class="small" style="color:var(--warn)">excluded</span>':'')+'</td>'; }).join('')+'</tr>'; }).join('')+'</tbody>';
+  var nRow=tm.rows.filter(function(r){ return r.q==='S_N'; })[0];
+  var trapped=(S.mode==='literal'||S.mode==='enforced') && nRow.cells.every(function(c){ return c.next==='S_N'||c.next==='S_HM'||c.gov; }) && nRow.cells.some(function(c){ return c.next==='S_N'; });
+  $('tmapNote').innerHTML = trapped ? 'With these signals, S<sub>N</sub> can only be left for S<sub>HM</sub> (|Δ| &lt; ε): a clear human or machine advantage keeps it in negotiation. Only line 3 (override, ethical risk, fairness) returns it to S<sub>H</sub>.' : '';
+}
+var LOG_COLS=['epoch','mode','q_t','CP_H','TR_H','VA_H','UC_H','CP_M','TR_M','VA_M','UC_M','VA_HM','ER','TC','FC','HO','S_H','S_M','delta','admissible','rule_line','q_t+1','admissible_result','fallback','reason'];
+function logRow(res){
+  var x=S.x;
+  return [S.log.length, S.mode, TXT[res.q], x.CP_H,x.TR_H,x.VA_H,x.UC_H,x.CP_M,x.TR_M,x.VA_M,x.UC_M,x.VA_HM,x.ER,x.TC,x.FC,x.HO,
+    res.SH.toFixed(4),res.SM.toFixed(4),res.delta.toFixed(4),admStr(res.A).replace(/, /g,' '),String(res.line),TXT[res.next],res.violation?'no':'yes',res.fallback?'yes':'no',ruleReason(S.mode,res)];
+}
+function renderLog(){
+  $('logTable').innerHTML = S.log.length===0
+    ? '<tbody><tr><td class="muted">No epochs logged yet. Press “Step one epoch” to record the current decision.</td></tr></tbody>'
+    : '<thead><tr><th>#</th><th>Policy</th><th>q<sub>t</sub></th><th class="n">S<sub>H</sub></th><th class="n">S<sub>M</sub></th><th class="n">Δ</th><th class="n">ER</th><th class="n">TC</th><th>HO/FC</th><th>Reason</th><th>q<sub>t+1</sub></th><th>Admissible</th></tr></thead><tbody>'+
+      S.log.map(function(r){ return '<tr><td class="n">'+r[0]+'</td><td class="mono small">'+r[1]+'</td><td>'+r[2]+'</td><td class="n">'+r[16]+'</td><td class="n">'+r[17]+'</td><td class="n">'+r[18]+'</td><td class="n">'+r[12]+'</td><td class="n">'+r[13]+'</td><td class="mono">'+r[15]+'/'+r[14]+'</td><td class="small" style="white-space:normal">'+r[24]+'</td><td>'+r[21]+'</td><td>'+(r[22]==='yes'?'yes':'<span class="pill bad">no</span>')+(r[23]==='yes'?' <span class="pill bad">fallback</span>':'')+'</td></tr>'; }).join('')+'</tbody>';
+  $('csvBox').value = csv();
+}
+function csv(){ return [LOG_COLS.join(',')].concat(S.log.map(function(r){ return r.map(function(v){ v=String(v); return /[",]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; }).join(','); })).join('\n'); }
+$('stepBtn').addEventListener('click', function(){ var res=M.step(S.q,S.x,S.p,S.mode); S.log.push(logRow(res)); S.q=res.next; render(); });
+$('clearLog').addEventListener('click', function(){ S.log=[]; render(); });
+$('copyCsv').addEventListener('click', function(){
+  var text=csv(), msg=$('copyMsg');
+  function fallback(){ var d=document.querySelector('#pane-roll details'); d.open=true; var b=$('csvBox'); b.focus(); b.select(); msg.textContent='Copy was blocked here. The CSV is selected in the box above; press Ctrl+C or ⌘C.'; }
+  try{ navigator.clipboard.writeText(text).then(function(){ msg.textContent='Copied '+S.log.length+' epoch'+(S.log.length===1?'':'s')+' as CSV.'; }, fallback); }catch(e){ fallback(); }
+});
+
+/* ---------- responsibility ---------- */
+var FACT=[['chi','χ','contribution'],['a','a','authority'],['k','k','knowledge'],['f','f','freedom'],['d','d','duty']];
+var PARTY={H:'Human',M:'Machine',G:'Supervisor'};
+(function buildRespInputs(){
+  var g=$('respInputs'); var h='<span></span>'+FACT.map(function(f){return '<span class="h" title="'+f[2]+'">'+f[1]+'</span>';}).join('');
+  ['H','M','G'].forEach(function(i){ h+='<span title="'+PARTY[i]+'"><b class="mono">'+i+'</b></span>'+FACT.map(function(f){ return '<input type="number" min="0" max="1" step="0.05" id="rf-'+i+'-'+f[0]+'" aria-label="'+PARTY[i]+' '+f[2]+'">'; }).join(''); });
+  g.innerHTML=h;
+  ['H','M','G'].forEach(function(i){ FACT.forEach(function(f){ $('rf-'+i+'-'+f[0]).addEventListener('input', function(){ var v=parseFloat(this.value); if (!isNaN(v)){ S.presets[S.respState][i][f[0]]=M.clip01(v); renderResp(true); } }); }); });
+})();
+var ySync = { sync:function(){ $('in-y').value=S.y; $('out-y').textContent=S.y.toFixed(2); } };
+$('in-y').addEventListener('input', function(){ S.y=parseFloat(this.value); render(); });
+$('respState').addEventListener('change', function(){ S.respState=this.value; S.respFollow=false; $('respFollow').checked=false; render(); });
+$('respFollow').addEventListener('change', function(){ S.respFollow=this.checked; render(); });
+$('respReset').addEventListener('click', function(){ S.presets[S.respState]=M.clone(M.RESP_PRESETS[S.respState]); render(); });
+function renderResp(fromInput){
+  var P=S.presets[S.respState];
+  $('respNote').textContent = S.loaded ? 'Loaded from scenario '+S.loaded+'. The notebook derives these factors from the scenario text and family profile only, so every regime uses the same values. “Reload preset” restores the illustrative value for this regime.' : 'The paper gives no default values for χ, a, k, f or d. These presets are illustrative placeholders; replace them with your own.';
+  $('respState').value=S.respState;
+  if (!fromInput) ['H','M','G'].forEach(function(i){ FACT.forEach(function(f){ $('rf-'+i+'-'+f[0]).value=P[i][f[0]]; }); });
+  ySync.sync();
+  var r=M.responsibility(P,S.y,S.p);
+  var svg=$('respChart'); clear(svg);
+  if (!r.ok){ el('text',{x:20,y:40,'font-size':13,fill:'var(--warn)'},svg,'All contributions χ are zero, so ψ in eq. (9) is undefined.'); $('respTable').innerHTML=''; $('respCheck').textContent=''; return; }
+  var x0=110, x1=570, W=x1-x0;
+  [0,.25,.5,.75,1].forEach(function(v){ var xx=x0+v*W; el('line',{x1:xx,x2:xx,y1:12,y2:140,stroke:'var(--line)','stroke-width':1},svg); el('text',{x:xx,y:158,'font-size':11,'text-anchor':'middle',class:'mt',fill:'var(--muted)'},svg,(v*100)+'%'); });
+  ['H','M','G'].forEach(function(i,j){
+    var row=r.rows[i], y=20+j*42;
+    el('text',{x:0,y:y+17,'font-size':12.5},svg,PARTY[i]);
+    el('rect',{x:x0,y:y,width:row.rp*W,height:24,fill:'var(--accent)'},svg);
+    el('rect',{x:x0+row.rp*W,y:y,width:row.rm*W,height:24,fill:'var(--warn)'},svg);
+    el('rect',{x:x0,y:y-3,width:Math.max(0.5,row.psi*W),height:30,fill:'none',stroke:'var(--muted)','stroke-width':1.2,'stroke-dasharray':'3 2'},svg);
+    var lx=x0+row.R*W+6; var anchor='start'; if (lx>x1-40){ lx=x0+row.R*W-6; anchor='end'; }
+    el('text',{x:lx,y:y+16,'font-size':12,'text-anchor':anchor,class:'mt',fill:anchor==='end'?'var(--panel)':'var(--ink)'},svg,(row.R*100).toFixed(1)+'%');
+  });
+  $('respTable').innerHTML='<thead><tr><th>Party</th><th class="n">ψ<sub>i</sub></th><th class="n">g<sub>i</sub><sup>+</sup></th><th class="n">g<sub>i</sub><sup>−</sup></th><th class="n">r<sub>i</sub><sup>+</sup></th><th class="n">r<sub>i</sub><sup>−</sup></th><th class="n">R<sub>i</sub></th><th class="n">R<sub>i</sub> − ψ<sub>i</sub></th></tr></thead><tbody>'+
+    ['H','M','G'].map(function(i){ var w=r.rows[i]; return '<tr><td>'+PARTY[i]+'</td><td class="n">'+w.psi.toFixed(3)+'</td><td class="n">'+w.gp.toFixed(3)+'</td><td class="n">'+w.gm.toFixed(3)+'</td><td class="n">'+w.rp.toFixed(3)+'</td><td class="n">'+w.rm.toFixed(3)+'</td><td class="n"><b>'+w.R.toFixed(3)+'</b></td><td class="n">'+fmt(w.R-w.psi)+'</td></tr>'; }).join('')+'</tbody>';
+  $('respCheck').innerHTML='Σ R<sub>i</sub> = <span class="mono">'+r.total.toFixed(6)+'</span> (eq. 12 requires 1)'+(r.fallbackPlus||r.fallbackMinus?' · zero denominator: shares fall back to ψ':'')+'. R<sub>i</sub> − ψ<sub>i</sub> &gt; 0 means a party answers for more than it contributed.';
+}
+
+/* ---------- P3 lab ---------- */
+var P3S={};
+(function buildP3(){
+  var g=$('p-sliders');
+  P3S.onset=sliderRow(g,'p-onset','onset','epoch at which the perturbation starts',function(){return S.p3.onset;},function(v){S.p3.onset=v;},1,20,1);
+  P3S.duration=sliderRow(g,'p-dur','duration','epochs the latency spike lasts',function(){return S.p3.duration;},function(v){S.p3.duration=v;},1,16,1);
+  P3S.magnitude=sliderRow(g,'p-mag','size','',function(){return S.p3.magnitude;},function(v){S.p3.magnitude=v;},0,1,0.01);
+  P3S.humanLoss=sliderRow(g,'p-hl','CP<sub>H</sub> loss','human capability lost under time pressure',function(){return S.p3.humanLoss;},function(v){S.p3.humanLoss=v;},0,0.6,0.01);
+  P3S.lag=sliderRow(g,'p-lag','lag','epochs before the drop is detected',function(){return S.p3.lag;},function(v){S.p3.lag=v;},0,12,1);
+  P3S.T=sliderRow(g,'p-T','horizon','epochs simulated',function(){return S.p3.T;},function(v){S.p3.T=v;},10,40,1);
+  $('p-kind').addEventListener('change',function(){ S.p3.kind=this.value; if (this.value==='latency'){ S.p3.magnitude=.90; S.p3.q0='S_H'; } else { S.p3.magnitude=.65; S.p3.q0='S_M'; } render(); });
+  $('p-q0').addEventListener('change',function(){ S.p3.q0=this.value; render(); });
+  $('p-loadEx').addEventListener('click',function(){
+    if (S.p3.kind==='silent'){ S.x=M.clone(EXAMPLES[0].x); S.p3.q0='S_M'; }
+    else { S.x=M.clone(EXAMPLES[2].x); S.p3.q0='S_H'; }
+    render();
+  });
+})();
+function rowLabel(k,txt){ var r=$('in-'+k).closest('.srow'); return r; }
+function renderP3(){
+  var c=S.p3, lat=c.kind==='latency';
+  $('p-kind').value=c.kind; $('p-q0').value=c.q0;
+  rowLabel('p-dur').hidden=!lat; rowLabel('p-hl').hidden=!lat; rowLabel('p-lag').hidden=lat;
+  var magRow=rowLabel('p-mag'); magRow.querySelector('label').innerHTML = lat ? 'TC level' : 'CP<sub>M</sub> drop';
+  Object.keys(P3S).forEach(function(k){ P3S[k].sync(); });
+  var base={x0:S.x,p:S.p,mode:S.mode,q0:c.q0,T:c.T,kind:c.kind,onset:c.onset,duration:lat?c.duration:c.T,magnitude:c.magnitude,humanLoss:lat?c.humanLoss:0,lag:lat?0:c.lag,presets:S.presets};
+  var A=M.perturbRun(Object.assign({},base,{traced:true})), B=M.perturbRun(Object.assign({},base,{traced:false}));
+  var winEnd = lat ? Math.min(c.T, c.onset+c.duration) : c.T;
+  var winW = Math.max(0, winEnd - Math.min(c.onset, c.T));
+  // strips
+  var svg=$('p-strip'); clear(svg);
+  var x0=118, x1=630, cw=(x1-x0)/c.T;
+  if (winW>0) el('rect',{x:x0+c.onset*cw,y:4,width:winW*cw,height:92,fill:'var(--line)'},svg);
+  [[A,'Logged handovers',14],[B,'No handover log',52]].forEach(function(z){
+    el('text',{x:0,y:z[2]+19,'font-size':12},svg,z[1]);
+    z[0].rows.forEach(function(r){ el('rect',{x:x0+r.t*cw+1,y:z[2],width:Math.max(1,cw-2),height:28,fill:SCOL[r.next]},svg);
+      if (r.violation) el('text',{x:x0+r.t*cw+cw/2,y:z[2]+19,'font-size':12,'text-anchor':'middle',fill:'var(--panel)','font-weight':700},svg,'!'); });
+  });
+  for (var t=0;t<c.T;t+=Math.max(1,Math.round(c.T/12))) el('text',{x:x0+t*cw+cw/2,y:110,'font-size':10.5,'text-anchor':'middle',class:'mt',fill:'var(--muted)'},svg,String(t));
+  var used={}; A.rows.concat(B.rows).forEach(function(r){used[r.next]=1;});
+  $('p-legend').innerHTML=M.STATES.filter(function(s){return used[s];}).map(function(s){return '<span><span class="sw" style="background:'+SCOL[s]+'"></span>'+TXT[s]+' '+M.STATE_LABEL[s]+'</span>';}).join('')+(A.violations+B.violations?'<span>! = result not admissible</span>':'');
+  // gap chart
+  var g=$('p-gap'); clear(g);
+  var gx0=48, gx1=630, gy0=14, gy1=196;
+  var all=A.rows.concat(B.rows).map(function(r){return r.gap;}).filter(function(v){return !isNaN(v);}); if (!all.length) all=[0];
+  var m=Math.max(0.1, Math.max.apply(null, all.map(Math.abs))); m=Math.ceil(m*10)/10;
+  var Y=function(v){ return gy0+(m-v)/(2*m)*(gy1-gy0); }, X=function(t){ return gx0+(t+0.5)*(gx1-gx0)/c.T; };
+  if (winW>0) el('rect',{x:gx0+c.onset*(gx1-gx0)/c.T,y:gy0,width:winW*(gx1-gx0)/c.T,height:gy1-gy0,fill:'var(--line)'},g);
+  [-m,-m/2,0,m/2,m].forEach(function(v){ el('line',{x1:gx0,x2:gx1,y1:Y(v),y2:Y(v),stroke:v===0?'var(--line-strong)':'var(--line)','stroke-width':1},g); el('text',{x:gx0-6,y:Y(v)+4,'font-size':10.5,'text-anchor':'end',class:'mt',fill:'var(--muted)'},g,fmt(v,2)); });
+  for (var t2=0;t2<c.T;t2+=Math.max(1,Math.round(c.T/12))) el('text',{x:X(t2),y:gy1+16,'font-size':10.5,'text-anchor':'middle',class:'mt',fill:'var(--muted)'},g,String(t2));
+  el('text',{x:gx1,y:gy1+30,'font-size':11,'text-anchor':'end',fill:'var(--muted)'},g,'epoch');
+  el('text',{x:gx0+4,y:gy0+12,'font-size':11,fill:'var(--muted)'},g,'human answers for more than contributed ↑');
+  [[B,'var(--warn)','5 3'],[A,'var(--accent)','none']].forEach(function(z){
+    var d='', pen=false;
+    z[0].rows.forEach(function(r){ if (isNaN(r.gap)){ pen=false; return; } d+=(pen?'L':'M')+X(r.t).toFixed(1)+' '+Y(r.gap).toFixed(1)+' '; pen=true; });
+    if (d) el('path',{d:d,fill:'none',stroke:z[1],'stroke-width':2.2,'stroke-dasharray':z[2]},g);
+    z[0].rows.forEach(function(r){ if (!isNaN(r.gap)) el('circle',{cx:X(r.t),cy:Y(r.gap),r:2.4,fill:z[1]},g); });
+  });
+  // KPIs
+  function mean(rows,a,b){ var s=0,n=0; rows.forEach(function(r){ if (r.t>=a&&r.t<b&&!isNaN(r.gap)){ s+=r.gap; n++; } }); return n? s/n : NaN; }
+  function f3(v){ return isNaN(v)?'—':fmt(v); }
+  function absmax(rows,a,b){ var s=0; rows.forEach(function(r){ if (r.t>=a&&r.t<b&&!isNaN(r.gap)) s=Math.max(s,Math.abs(r.gap)); }); return s; }
+  var preA=mean(A.rows,0,c.onset), durA=mean(A.rows,c.onset,winEnd), preB=mean(B.rows,0,c.onset), durB=mean(B.rows,c.onset,winEnd);
+  var dA=durA-preA, dB=durB-preB;
+  function k(lbl,v,sub){ return '<div class="kpi"><h3>'+lbl+'</h3><span class="v">'+v+'</span>'+(sub?'<span class="small muted">'+sub+'</span>':'')+'</div>'; }
+  $('p-kpis').innerHTML =
+    k('Gap change, logged', f3(dA), 'mean before '+f3(preA)+' → during '+f3(durA)) +
+    k('Gap change, no log', f3(dB), 'mean before '+f3(preB)+' → during '+f3(durB)) +
+    k('Peak |gap|, no log', absmax(B.rows,c.onset,winEnd).toFixed(3), 'logged: '+absmax(A.rows,c.onset,winEnd).toFixed(3)) +
+    k('Authority transfers', A.transfers+' / '+B.transfers, 'logged / no log') +
+    k('Untraced H↔M jumps', String(B.untraced), 'transfers with no handover state') +
+    k('Inadmissible results', A.violations+' / '+B.violations, 'logged / no log');
+  var read;
+  var zc=A.zeroChi.concat(B.zeroChi).filter(function(s,i,a){return a.indexOf(s)===i;});
+  if (zc.length) read='All contributions χ are zero in the preset for '+zc.map(function(s){return TXT[s];}).join(', ')+', so ψ and the gap are undefined in those epochs. Set a non-zero χ on the Responsibility tab.';
+  else if (c.onset>=c.T) read='The onset lies beyond the horizon, so nothing is perturbed.';
+  else if (Math.abs(dA)<1e-9 && Math.abs(dB)<1e-9) read='The perturbation does not change the regime or the gap under these settings. The test is not exercised: try a larger perturbation or a different start state.';
+  else {
+    var wid = (dB>dA+1e-9)?'widens more without the handover log':((dA>dB+1e-9)?'widens more with the handover log':'moves equally in both conditions');
+    read='Under this perturbation the mean gap '+wid+' ('+fmt(dA)+' logged vs '+fmt(dB)+' unlogged). P3 would be falsified if the gap did not widen, or widened equally with and without tracing. These numbers follow from the illustrative presets and the outcome model listed under Parameters & notes; they show how the test works, not its result.';
+  }
+  $('p-read').textContent=read;
+  // table
+  $('p-table').innerHTML='<thead><tr><th>t</th><th class="n">TC</th><th class="n">CP<sub>M</sub> obs</th><th class="n">CP<sub>M</sub> true</th><th class="n">Δ</th><th>logged</th><th class="n">gap</th><th>no log</th><th>record</th><th class="n">gap</th><th class="n">y</th></tr></thead><tbody>'+
+    A.rows.map(function(r,i){ var b=B.rows[i]; return '<tr><td class="n">'+r.t+'</td><td class="n">'+r.TC.toFixed(2)+'</td><td class="n">'+r.CPMobs.toFixed(2)+'</td><td class="n">'+r.CPMtrue.toFixed(2)+'</td><td class="n">'+fmt(r.delta)+'</td><td>'+TXT[r.next]+(r.violation?' !':'')+'</td><td class="n">'+(isNaN(r.gap)?'—':fmt(r.gap))+'</td><td>'+TXT[b.next]+(b.violation?' !':'')+'</td><td class="mono small">'+TXT[b.recorded]+'</td><td class="n">'+(isNaN(b.gap)?'—':fmt(b.gap))+'</td><td class="n">'+(isNaN(r.y)?'—':r.y.toFixed(2))+'</td></tr>'; }).join('')+'</tbody>';
+}
+
+/* ---------- scenario replay ---------- */
+var REPORTED = {S_H:26,S_HM:45,S_N:28,S_M:1};
+(function buildScen(){
+  var f=$('sc-fam'); var o=document.createElement('option'); o.value=''; o.textContent='All 20 families'; f.appendChild(o);
+  Object.keys(SCEN_FAMILIES).forEach(function(k){ var o=document.createElement('option'); o.value=k; o.textContent=k+' — '+SCEN_FAMILIES[k]; f.appendChild(o); });
+  var st=$('sc-state'); var o2=document.createElement('option'); o2.value=''; o2.textContent='Any'; st.appendChild(o2);
+  M.STATES.forEach(function(s){ var o=document.createElement('option'); o.value=s; o.textContent=TXT[s]+' — '+M.STATE_LABEL[s]; st.appendChild(o); });
+  f.addEventListener('change',render); st.addEventListener('change',render);
+  $('sc-table').addEventListener('click',function(e){
+    var b=e.target.closest('button[data-sid]'); if(!b) return;
+    var sc=SCENARIOS[+b.getAttribute('data-sid')-1];
+    S.x=M.clone(sc.x); S.q='S_H'; S.y=sc.y; S.loaded=sc.id;
+    M.STATES.forEach(function(st){ S.presets[st]=M.clone(sc.P); });
+    showTab('epoch');
+  });
+})();
+function replayOne(sc){
+  var q='S_H', first=null, viol=false;
+  for (var k=0;k<4;k++){ var r=M.step(q,sc.x,S.p,S.mode); if(first===null) first=r; if(r.violation) viol=true; if(r.next===q) break; q=r.next; }
+  return { one:first, stable:q, viol:viol, resp:M.responsibility(sc.P,sc.y,S.p) };
+}
+function renderScen(){
+  var res=SCENARIOS.map(replayOne), counts={}, match=0, mH=0,mM=0,mG=0;
+  res.forEach(function(r,i){ counts[r.stable]=(counts[r.stable]||0)+1; if(r.stable===SCENARIOS[i].os && r.one.next===SCENARIOS[i].o1) match++; mH+=r.resp.rows.H.R; mM+=r.resp.rows.M.R; mG+=r.resp.rows.G.R; });
+  $('sc-match').className='pill '+(match===100?'good':'bad');
+  $('sc-match').textContent=match+' / 100 match the notebook';
+  $('sc-kpis').innerHTML=['S_H','S_HM','S_N','S_M','S_HtoM','S_MtoH'].map(function(s){ var n=counts[s]||0, rep=REPORTED[s]||0;
+    return '<div class="kpi"><h3><span class="sw" style="background:'+SCOL[s]+'"></span>'+TXT[s]+'</h3><span class="v">'+n+'</span><span class="small muted">paper: '+rep+(n!==rep?' · <b style="color:var(--warn)">'+(n>rep?'+':'')+(n-rep)+'</b>':'')+'</span></div>'; }).join('')+
+    '<div class="kpi"><h3>Mean responsibility</h3><span class="v" style="font-size:15px">'+(mH).toFixed(1)+' / '+(mM).toFixed(1)+' / '+(mG).toFixed(1)+'%</span><span class="small muted">human / machine / supervisor · paper 63.3 / 23.3 / 13.4</span></div>';
+  var c={HO:0,FC:0,ER:0,VA:0,TC:0}; SCENARIOS.forEach(function(sc){ if(sc.x.HO) c.HO++; if(sc.x.FC) c.FC++; if(sc.x.ER>=S.p.rho) c.ER++; if(sc.x.VA_HM<S.p.tau) c.VA++; if(sc.x.TC>=S.p.kappa) c.TC++; });
+  var maxER=Math.max.apply(null,SCENARIOS.map(function(s){return s.x.ER;})), maxTC=Math.max.apply(null,SCENARIOS.map(function(s){return s.x.TC;}));
+  $('sc-constraints').innerHTML='Constraint activity in this corpus: HO = 1 in <b>'+c.HO+'</b> cases, FC = 1 in <b>'+c.FC+'</b>, ER ≥ ρ in <b>'+c.ER+'</b> (max ER '+maxER.toFixed(3)+'), VA<sub>HM</sub> &lt; τ in <b>'+c.VA+'</b>, TC ≥ κ in <b>'+c.TC+'</b> (max TC '+maxTC.toFixed(3)+').'+(c.ER+c.VA+c.TC===0?' Three of the four exclusions never fire, so the validation does not exercise them.':'');
+  var ff=$('sc-fam').value, fs=$('sc-state').value, shown=0;
+  var rows=SCENARIOS.map(function(sc,i){ var r=res[i]; if((ff&&sc.f!==ff)||(fs&&r.stable!==fs)) return ''; shown++;
+    var ok=r.stable===sc.os&&r.one.next===sc.o1;
+    var flags=(sc.x.HO?'HO ':'')+(sc.x.FC?'FC':'');
+    return '<tr><td class="n">'+sc.id+'</td><td class="mono">'+sc.f+'</td><td style="white-space:normal;min-width:16em">'+sc.t+'</td><td class="n">'+fmt(r.one.delta)+'</td><td class="mono small">'+(flags||'—')+'</td><td>'+SHORT[r.one.next]+'<br><span class="small muted">'+ruleReason(S.mode,r.one)+'</span></td><td><span class="sw" style="background:'+SCOL[r.stable]+'"></span>'+SHORT[r.stable]+(r.viol?' <span class="pill bad">excluded</span>':'')+'</td><td class="n">'+(100*r.resp.rows.H.R).toFixed(1)+'</td><td class="n">'+(100*r.resp.rows.M.R).toFixed(1)+'</td><td class="n">'+(100*r.resp.rows.G.R).toFixed(1)+'</td><td>'+(ok?'<span style="color:var(--ok)">✓</span>':'<span style="color:var(--warn)">'+TXT[sc.os]+'</span>')+'</td><td><button class="btn" type="button" data-sid="'+sc.id+'">Open</button></td></tr>'; }).join('');
+  $('sc-shown').textContent=shown+' shown';
+  $('sc-table').innerHTML='<thead><tr><th>#</th><th>Fam.</th><th>Scenario</th><th class="n">Δ</th><th>Flags</th><th>One step</th><th>Stable</th><th class="n">R<sub>H</sub> %</th><th class="n">R<sub>M</sub> %</th><th class="n">R<sub>G</sub> %</th><th>Notebook</th><th></th></tr></thead><tbody>'+rows+'</tbody>';
+}
+
+/* ---------- parameters ---------- */
+var PSYNC=[];
+(function buildPar(){
+  var names=['CP','TR','VA','1−UC'];
+  ['wH','wM'].forEach(function(w){ var g=$('par-'+w); names.forEach(function(n,i){ var id='par-'+w+'-'+i; var l=document.createElement('label'); l.innerHTML='<span>'+n+'</span><input type="number" id="'+id+'" min="0" max="1" step="0.05">'; g.appendChild(l);
+    var inp=l.querySelector('input'); inp.addEventListener('input',function(){ var v=parseFloat(inp.value); if(!isNaN(v)&&v>=0){ S.p[w][i]=v; render(true); } }); PSYNC.push(function(){ inp.value=S.p[w][i]; }); }); });
+  var th=[['thetaM','θ<sub>M</sub>'],['thetaH','θ<sub>H</sub>'],['eps','ε'],['rho','ρ'],['tau','τ'],['kappa','κ']];
+  th.forEach(function(t){ var l=document.createElement('label'); l.innerHTML='<span>'+t[1]+'</span><input type="number" id="par-'+t[0]+'" min="0" max="1" step="0.01">'; $('par-th').appendChild(l);
+    var inp=l.querySelector('input'); inp.addEventListener('input',function(){ var v=parseFloat(inp.value); if(!isNaN(v)){ S.p[t[0]]=v; render(true); } }); PSYNC.push(function(){ inp.value=S.p[t[0]]; }); });
+  var ex=[['alpha',0,'α<sub>a</sub>'],['alpha',1,'α<sub>k</sub>'],['alpha',2,'α<sub>d</sub>'],['beta',0,'β<sub>a</sub>'],['beta',1,'β<sub>k</sub>'],['beta',2,'β<sub>f</sub>'],['beta',3,'β<sub>d</sub>']];
+  ex.forEach(function(e){ var l=document.createElement('label'); l.innerHTML='<span>'+e[2]+'</span><input type="number" id="par-'+e[0]+e[1]+'" min="0" max="5" step="0.1">'; $('par-ex').appendChild(l);
+    var inp=l.querySelector('input'); inp.addEventListener('input',function(){ var v=parseFloat(inp.value); if(!isNaN(v)&&v>=0){ S.p[e[0]][e[1]]=v; render(true); } }); PSYNC.push(function(){ inp.value=S.p[e[0]][e[1]]; }); });
+  $('parReset').addEventListener('click',function(){ S.p=M.clone(M.DEFAULT_PARAMS); render(); });
+})();
+function renderPar(fromInput){
+  if (!fromInput) PSYNC.forEach(function(f){ f(); });
+  var sH=S.p.wH.reduce(function(a,b){return a+b;},0), sM=S.p.wM.reduce(function(a,b){return a+b;},0);
+  var ok=Math.abs(sH-1)<1e-6&&Math.abs(sM-1)<1e-6;
+  $('wNote').innerHTML = ok ? '<span style="color:var(--ok)">Both weight vectors sum to 1, as eq. (2) requires.</span>' : '<span style="color:var(--warn)">Eq. (2) requires each weight vector to sum to 1. Current sums: w<sup>H</sup> '+sH.toFixed(2)+', w<sup>M</sup> '+sM.toFixed(2)+'. Scores are computed as entered.</span>';
+}
+
+/* ---------- master render ---------- */
+function matchExample(){
+  for (var i=0;i<EXAMPLES.length;i++){ var e=EXAMPLES[i], same=true; for (var k in e.x) if (Math.abs(e.x[k]-S.x[k])>1e-9){ same=false; break; } if (same) return i; }
+  return -1;
+}
+function render(fromParamInput){
+  syncers.forEach(function(s){ s.sync(); });
+  $('in-FC').checked=S.x.FC===1; $('in-HO').checked=S.x.HO===1;
+  $('qSel').value=S.q;
+  var ei=matchExample(); $('exampleSel').value = ei>=0 ? String(ei) : 'custom';
+  var lsc = S.loaded ? SCENARIOS[S.loaded-1] : null; var lmatch = lsc && Object.keys(lsc.x).every(function(k){ return Math.abs(lsc.x[k]-S.x[k])<1e-9; });
+  if (!lmatch) S.loaded = null;
+  $('exampleNote').textContent = ei>=0 ? EXAMPLES[ei].note : (lmatch ? 'Scenario '+lsc.id+' ('+lsc.f+'): '+lsc.t+'. Its responsibility inputs are loaded on the Responsibility tab.' : 'Inputs edited by hand.');
+  $('modeNote').textContent=MODE_NOTE[S.mode];
+  $('dbRow').hidden = S.mode!=='revised'; $('deadBandSel').value = S.p.deadBand||'negotiate';
+  var res=M.step(S.q,S.x,S.p,S.mode);
+  if (S.respFollow) S.respState=res.next;
+  if (S.tab==='epoch') renderEpoch(res);
+  if (S.tab==='roll') renderRoll();
+  if (S.tab==='resp') renderResp(false);
+  if (S.tab==='p3') renderP3();
+  if (S.tab==='scen') renderScen();
+  if (S.tab==='par') renderPar(fromParamInput===true);
+}
+var startTab='epoch';
+try{ var st=localStorage.getItem('mcsm-tab'); if (st && TABS.indexOf(st)>=0) startTab=st; }catch(e){}
+var hash=(location.hash||'').replace('#',''); if (TABS.indexOf(hash)>=0) startTab=hash;
+showTab(startTab);
+})();
+</script>
+</body>
+</html>
