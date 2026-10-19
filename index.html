@@ -149,6 +149,7 @@ footer{color:var(--muted);font-size:12px;border-top:1px solid var(--line);paddin
 
 <nav class="tabs" role="tablist" aria-label="Instruments">
   <button role="tab" id="tab-epoch" aria-selected="true" aria-controls="pane-epoch">Decision epoch</button>
+  <button role="tab" id="tab-land" aria-selected="false" aria-controls="pane-land">Strength landscape</button>
   <button role="tab" id="tab-roll" aria-selected="false" aria-controls="pane-roll">Rollout &amp; log</button>
   <button role="tab" id="tab-resp" aria-selected="false" aria-controls="pane-resp">Responsibility</button>
   <button role="tab" id="tab-scen" aria-selected="false" aria-controls="pane-scen">Scenario replay</button>
@@ -218,6 +219,26 @@ footer{color:var(--muted);font-size:12px;border-top:1px solid var(--line);paddin
       <p id="sensSummary"></p>
       <div class="tablebox"><table id="sensTable"></table></div>
     </div>
+  </div>
+</div>
+</section>
+
+<!-- ============ STRENGTH LANDSCAPE ============ -->
+<section id="pane-land" role="tabpanel" aria-labelledby="tab-land" hidden>
+<div class="rail">
+  <div class="panel">
+    <div class="row" style="justify-content:space-between;align-items:flex-end">
+      <div><h2>Strength landscape</h2>
+      <p class="muted small" style="max-width:78ch">Height is Δ = S<sub>M</sub> − S<sub>H</sub> as two inputs vary from 0 to 1; colour is the next state the selected rule chooses from the current state q<sub>t</sub>. All other inputs stay at their values on the Decision epoch tab. Drag to rotate, scroll or pinch to zoom.</p></div>
+      <div class="row">
+        <label class="small" for="land-x">Across</label><select id="land-x"></select>
+        <label class="small" for="land-y">Depth</label><select id="land-y"></select>
+        <button class="btn" type="button" id="land-reset">Reset view</button>
+      </div>
+    </div>
+    <div style="position:relative"><canvas id="land" style="width:100%;height:540px;display:block;touch-action:none;cursor:grab;border-radius:6px;background:var(--bg)" aria-label="3D strength landscape"></canvas></div>
+    <div class="legend" id="land-legend"></div>
+    <p class="small" id="land-note"></p>
   </div>
 </div>
 </section>
@@ -751,7 +772,7 @@ var S = {
 };
 
 /* ---------- tabs ---------- */
-var TABS = ['epoch','roll','resp','scen','p3','par'];
+var TABS = ['epoch','land','roll','resp','scen','p3','par'];
 function showTab(t){
   S.tab = t;
   TABS.forEach(function(k){ $('tab-'+k).setAttribute('aria-selected', k===t ? 'true':'false'); $('pane-'+k).hidden = k!==t; });
@@ -1226,6 +1247,102 @@ function renderScen(){
   $('sc-table').innerHTML='<thead><tr><th>#</th><th>Fam.</th><th>Scenario</th><th class="n">Δ</th><th>Flags</th><th>One step</th><th>Stable</th><th class="n">R<sub>H</sub> %</th><th class="n">R<sub>M</sub> %</th><th class="n">R<sub>G</sub> %</th><th>Notebook</th><th></th></tr></thead><tbody>'+rows+'</tbody>';
 }
 
+/* ---------- 3D strength landscape (hand-drawn on canvas, no library) ---------- */
+var LAND = { yaw:-0.75, pitch:0.62, zoom:1, xKey:'CP_H', yKey:'CP_M', N:40, grid:null };
+var LAND_KEYS = ['CP_H','TR_H','VA_H','UC_H','CP_M','TR_M','VA_M','UC_M','VA_HM','ER','TC'];
+(function buildLand(){
+  ['land-x','land-y'].forEach(function(id,j){ var sel=$(id); LAND_KEYS.forEach(function(k){ var o=document.createElement('option'); o.value=k; o.textContent=k; sel.appendChild(o); });
+    sel.addEventListener('change',function(){ if (j===0) LAND.xKey=this.value; else LAND.yKey=this.value; if (LAND.xKey===LAND.yKey){ var other=LAND_KEYS.filter(function(k){return k!==LAND.xKey;})[0]; if(j===0) LAND.yKey=other; else LAND.xKey=other; } render(); }); });
+  $('land-reset').addEventListener('click',function(){ LAND.yaw=-0.75; LAND.pitch=0.62; LAND.zoom=1; drawLand(); });
+  var cv=$('land'), drag=null, pinch=null, pts={};
+  cv.addEventListener('pointerdown',function(e){ cv.setPointerCapture(e.pointerId); pts[e.pointerId]={x:e.clientX,y:e.clientY}; drag={x:e.clientX,y:e.clientY}; cv.style.cursor='grabbing'; });
+  cv.addEventListener('pointermove',function(e){
+    if (!pts[e.pointerId]) return; pts[e.pointerId]={x:e.clientX,y:e.clientY};
+    var ids=Object.keys(pts);
+    if (ids.length===2){ var a=pts[ids[0]], b=pts[ids[1]], d=Math.hypot(a.x-b.x,a.y-b.y); if (pinch) LAND.zoom=Math.max(0.5,Math.min(2.5,LAND.zoom*d/pinch)); pinch=d; requestAnimationFrame(drawLand); return; }
+    if (!drag) return;
+    LAND.yaw += (e.clientX-drag.x)*0.008; LAND.pitch=Math.max(0.08,Math.min(1.45,LAND.pitch+(e.clientY-drag.y)*0.006));
+    drag={x:e.clientX,y:e.clientY}; requestAnimationFrame(drawLand); });
+  function up(e){ delete pts[e.pointerId]; if (Object.keys(pts).length<2) pinch=null; if (!Object.keys(pts).length){ drag=null; cv.style.cursor='grab'; } }
+  cv.addEventListener('pointerup',up); cv.addEventListener('pointercancel',up);
+  cv.addEventListener('wheel',function(e){ e.preventDefault(); LAND.zoom=Math.max(0.5,Math.min(2.5,LAND.zoom*(e.deltaY<0?1.08:1/1.08))); requestAnimationFrame(drawLand); },{passive:false});
+  window.addEventListener('resize',function(){ if (S.tab==='land') drawLand(); });
+})();
+function cssColor(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+function hexRgb(h){ h=h.replace('#',''); if (h.length===3) h=h.split('').map(function(c){return c+c;}).join(''); var n=parseInt(h,16); return [(n>>16)&255,(n>>8)&255,n&255]; }
+function computeLand(){
+  var N=LAND.N, xs=LAND.xKey, ys=LAND.yKey, corners=[], cells=[], dmin=Infinity, dmax=-Infinity;
+  for (var i=0;i<=N;i++){ corners[i]=[]; for (var j=0;j<=N;j++){ var x2=Object.assign({},S.x); x2[xs]=i/N; x2[ys]=j/N; var d=M.scores(x2,S.p).delta; corners[i][j]=d; if(d<dmin)dmin=d; if(d>dmax)dmax=d; } }
+  for (var a=0;a<N;a++){ cells[a]=[]; for (var b=0;b<N;b++){ var x3=Object.assign({},S.x); x3[xs]=(a+0.5)/N; x3[ys]=(b+0.5)/N; var r=M.decide(S.q,M.scores(x3,S.p).delta,x3,S.p,S.mode); cells[a][b]={s:r.next,bad:r.violation&&S.mode!=='enforced'}; } }
+  var cur=M.scores(S.x,S.p).delta, ext=Math.max(Math.abs(dmin),Math.abs(dmax),Math.abs(cur),S.p.thetaM,S.p.thetaH,0.25)*1.05;
+  LAND.grid={corners:corners,cells:cells,ext:ext,cur:cur,dmin:dmin,dmax:dmax};
+}
+function drawLand(){
+  var cv=$('land'); if (!LAND.grid) return;
+  var dpr=window.devicePixelRatio||1, W=cv.clientWidth, H=cv.clientHeight;
+  if (cv.width!==Math.round(W*dpr)||cv.height!==Math.round(H*dpr)){ cv.width=Math.round(W*dpr); cv.height=Math.round(H*dpr); }
+  var g=cv.getContext('2d'); g.setTransform(dpr,0,0,dpr,0,0); g.clearRect(0,0,W,H);
+  var G=LAND.grid, N=LAND.N, ink=cssColor('--ink'), muted=cssColor('--muted'), line=cssColor('--line-strong');
+  var cy=Math.cos(LAND.yaw), sy=Math.sin(LAND.yaw), cp=Math.cos(LAND.pitch), sp=Math.sin(LAND.pitch);
+  var scale=Math.min(W/1.8,H/1.9)*LAND.zoom, camD=3.2;
+  function P(X,Y,Z){ // world: X,Y in [-.5,.5], Z height
+    var x1=X*cy-Y*sy, y1=X*sy+Y*cy;            // yaw about vertical axis
+    var y2=y1*cp-Z*sp, z2=y1*sp+Z*cp;           // pitch
+    var f=camD/(camD+y2); return {x:W/2+x1*scale*f, y:H*0.5-z2*scale*f, d:y2};
+  }
+  var HZ=0.36; function Zof(d){ return d/G.ext*HZ; }
+  // floor and box
+  var fz=-HZ-0.04, c4=[[-.5,-.5],[.5,-.5],[.5,.5],[-.5,.5]];
+  g.strokeStyle=line; g.lineWidth=1; g.beginPath(); c4.forEach(function(c,k){ var p=P(c[0],c[1],fz); k?g.lineTo(p.x,p.y):g.moveTo(p.x,p.y); }); g.closePath(); g.stroke();
+  // floor grid
+  g.globalAlpha=0.35; for (var t=1;t<4;t++){ var u=-.5+t/4; var a1=P(u,-.5,fz),a2=P(u,.5,fz),b1=P(-.5,u,fz),b2=P(.5,u,fz); g.beginPath(); g.moveTo(a1.x,a1.y); g.lineTo(a2.x,a2.y); g.moveTo(b1.x,b1.y); g.lineTo(b2.x,b2.y); g.stroke(); } g.globalAlpha=1;
+  // vertical axis at the corner farthest from viewer
+  var far=c4.slice().sort(function(a,b){ return P(b[0],b[1],0).d-P(a[0],a[1],0).d; })[0];
+  var vb=P(far[0],far[1],fz), vt=P(far[0],far[1],HZ); g.beginPath(); g.moveTo(vb.x,vb.y); g.lineTo(vt.x,vt.y); g.stroke();
+  g.font='11px '+getComputedStyle(document.body).fontFamily; g.fillStyle=muted;
+  [[-G.ext,fmt(-G.ext,2)],[0,'0'],[G.ext,fmt(G.ext,2)]].forEach(function(z){ var p=P(far[0],far[1],Zof(z[0])); g.fillText(z[1],p.x+6,p.y+4); g.beginPath(); g.moveTo(p.x-3,p.y); g.lineTo(p.x+3,p.y); g.stroke(); });
+  var vlab=P(far[0],far[1],HZ+0.06); g.fillStyle=ink; g.fillText('Δ',vlab.x-3,vlab.y);
+  // axis labels and ticks on floor
+  g.fillStyle=muted;
+  [0,0.5,1].forEach(function(v){ var px=P(v-.5,-.5-0.07,fz), py=P(-.5-0.07,v-.5,fz); g.fillText(v.toFixed(1),px.x-8,px.y+4); g.fillText(v.toFixed(1),py.x-8,py.y+4); });
+  var lx=P(0,-.5-0.17,fz), ly=P(-.5-0.17,0,fz); g.fillStyle=ink; g.font='600 12px '+getComputedStyle(document.body).fontFamily; g.fillText(LAND.xKey,lx.x-16,lx.y+4); g.fillText(LAND.yKey,ly.x-16,ly.y+4);
+  // surface quads, painter's algorithm
+  var cols={}; M.STATES.forEach(function(s){ cols[s]=hexRgb(cssColor({S_H:'--st-H',S_HtoM:'--st-Hs',S_M:'--st-M',S_MtoH:'--st-Ms',S_HM:'--st-HM',S_N:'--st-N'}[s])); });
+  var quads=[], L=[-0.35,-0.45,0.82], Ln=Math.hypot(L[0],L[1],L[2]);
+  for (var i=0;i<N;i++) for (var j=0;j<N;j++){
+    var X0=i/N-.5, X1=(i+1)/N-.5, Y0=j/N-.5, Y1=(j+1)/N-.5;
+    var z00=Zof(G.corners[i][j]), z10=Zof(G.corners[i+1][j]), z11=Zof(G.corners[i+1][j+1]), z01=Zof(G.corners[i][j+1]);
+    var p=[P(X0,Y0,z00),P(X1,Y0,z10),P(X1,Y1,z11),P(X0,Y1,z01)];
+    var nx=-(z10-z00)*N, ny=-(z01-z00)*N, nz=1, nn=Math.hypot(nx,ny,nz);
+    var lit=0.62+0.38*Math.max(0,(nx*L[0]+ny*L[1]+nz*L[2])/(nn*Ln));
+    quads.push({p:p,d:(p[0].d+p[1].d+p[2].d+p[3].d)/4,c:cols[G.cells[i][j].s],lit:lit,bad:G.cells[i][j].bad});
+  }
+  quads.sort(function(a,b){ return b.d-a.d; });
+  quads.forEach(function(q){
+    var c=q.c, k=q.lit, fill='rgb('+Math.round(c[0]*k)+','+Math.round(c[1]*k)+','+Math.round(c[2]*k)+')';
+    g.fillStyle=fill; g.strokeStyle=fill; g.lineWidth=0.6;
+    g.beginPath(); g.moveTo(q.p[0].x,q.p[0].y); for (var m=1;m<4;m++) g.lineTo(q.p[m].x,q.p[m].y); g.closePath(); g.fill(); g.stroke();
+    if (q.bad){ g.strokeStyle=cssColor('--warn'); g.lineWidth=1; g.beginPath(); g.moveTo(q.p[0].x,q.p[0].y); g.lineTo(q.p[2].x,q.p[2].y); g.stroke(); }
+  });
+  // current point
+  var cxv=S.x[LAND.xKey]-.5, cyv=S.x[LAND.yKey]-.5, cp0=P(cxv,cyv,fz), cp1=P(cxv,cyv,Zof(G.cur));
+  g.setLineDash([4,3]); g.strokeStyle=ink; g.lineWidth=1.2; g.beginPath(); g.moveTo(cp0.x,cp0.y); g.lineTo(cp1.x,cp1.y); g.stroke(); g.setLineDash([]);
+  g.fillStyle=cssColor('--panel'); g.strokeStyle=ink; g.lineWidth=2; g.beginPath(); g.arc(cp1.x,cp1.y,6,0,Math.PI*2); g.fill(); g.stroke();
+  g.fillStyle=ink; g.font='600 12px '+getComputedStyle(document.body).fontFamily; g.fillText('current',cp1.x+9,cp1.y-8);
+}
+function renderLand(){
+  $('land-x').value=LAND.xKey; $('land-y').value=LAND.yKey;
+  computeLand(); drawLand();
+  var used={}; LAND.grid.cells.forEach(function(r){ r.forEach(function(c){ used[c.s]=(used[c.s]||0)+1; }); });
+  var tot=LAND.N*LAND.N;
+  $('land-legend').innerHTML=M.STATES.filter(function(s){return used[s];}).map(function(s){ return '<span><span class="sw" style="background:'+SCOL[s]+'"></span>'+TXT[s]+' '+M.STATE_LABEL[s]+' · '+Math.round(100*used[s]/tot)+'%</span>'; }).join('')+'<span><span class="sw" style="background:var(--panel);border:2px solid var(--ink);border-radius:50%"></span>current inputs</span>';
+  var flat = Math.abs(LAND.grid.dmax-LAND.grid.dmin)<1e-9;
+  var anyBad = LAND.grid.cells.some(function(r){ return r.some(function(c){ return c.bad; }); });
+  $('land-note').innerHTML = 'From q<sub>t</sub> = '+SHORT[S.q]+'. Δ ranges from '+fmt(LAND.grid.dmin)+' to '+fmt(LAND.grid.dmax)+' over this plane.'+
+    (flat?' Neither input enters the strength scores, so the surface is flat; the colours still change where governance thresholds are crossed.':'')+
+    (anyBad?' Orange strokes mark cells where the rule selects a state the constraints forbid.':'');
+}
+
 /* ---------- parameters ---------- */
 var PSYNC=[];
 (function buildPar(){
@@ -1269,6 +1386,7 @@ function render(fromParamInput){
   if (S.tab==='resp') renderResp(false);
   if (S.tab==='p3') renderP3();
   if (S.tab==='scen') renderScen();
+  if (S.tab==='land') renderLand();
   if (S.tab==='par') renderPar(fromParamInput===true);
 }
 var startTab='epoch';
