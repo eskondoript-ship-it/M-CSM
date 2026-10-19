@@ -20,7 +20,7 @@ To publish it as a web page, enable **GitHub Pages** for this repository (Settin
 | Responsibility drift | Perturbation test: silent machine accuracy drop or latency spike, with and without logged handovers |
 | Parameters & notes | All weights, thresholds and exponents, plus the model notes |
 
-The page has a 3D look and is animated: raised panels and keys, bevelled chart shapes, and charts that tilt with the mouse (except the Δ ruler and the state-transition graph, which stay flat and still). Sliders are coloured from the start to the knob. Sections fly in when opened, charts draw themselves, the next-state card flips when the state changes, and the strength landscape grows and slowly spins (pause button provided). Animations are turned off when the system asks for reduced motion. The section tabs stay at the top while you scroll (on phones they form one row you can swipe).
+The page has a 3D look and is animated: raised panels and keys and bevelled chart shapes; the charts themselves are flat and still. Sliders are coloured from the start to the knob. Sections fly in when opened, the next-state card flips when the state changes, and the strength landscape grows and slowly spins (pause button provided). Animations are turned off when the system asks for reduced motion. The section tabs stay at the top while you scroll (on phones they form one row you can swipe).
 
 Four transition rules can be compared:
 
