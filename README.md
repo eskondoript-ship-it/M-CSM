@@ -16,7 +16,9 @@ To publish it as a web page, enable **GitHub Pages** for this repository (Settin
 | Strength landscape | Rotatable 3D surface of Δ over any two context inputs, coloured by the next state the selected rule chooses; forbidden regions are hatched and the current input is marked |
 | Rollout & log | Repeat the decision under a fixed context until the state is stable; step through epochs and copy the log as CSV; transition map of every state and Δ region |
 | Responsibility | Success and blame shares for human, machine and supervisor, with conservation check |
-| Scenario replay | The 100-scenario validation set, replayed live under any rule and threshold setting |
+| Scenario replay | The 100-scenario validation set, replayed live under any rule and threshold setting; download the set as CSV, edit or add rows, and import it back |
+| Scenario builder | Script how inputs change over time (steps or ramps), play the story epoch by epoch, and see the state chosen by all four rules side by side; stories import and export as CSV |
+| Rule comparison | Monte Carlo test of the four rules on up to 200,000 random contexts with a fixed seed: forbidden results by constraint, disagreement between rules, where repeated epochs settle, and the most common disagreements |
 | Responsibility drift | Perturbation test: silent machine accuracy drop or latency spike, with and without logged handovers |
 | Parameters & notes | All weights, thresholds and exponents, plus the model notes |
 
@@ -28,6 +30,11 @@ Four transition rules can be compared:
 - **Human fallback**: the published rule, with any forbidden result replaced by human-led control.
 - **Compact**: the stateless summary rule.
 - **Admissibility-preserving**: the proposed revised rule. It never selects a forbidden state, lets negotiation and shared control be left when one agent is clearly stronger, and reverses interrupted handovers.
+
+## Export and sharing
+
+- Every chart has **PNG** (3× resolution) and **SVG** buttons, the 3D landscape a PNG button, and every table a **CSV** button.
+- **Share settings** (under the title) gives a link that opens this page with every input, rule, threshold, responsibility value, story and comparison setting restored, and can save or load the settings as a JSON file.
 
 ## Files
 
