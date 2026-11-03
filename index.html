@@ -218,6 +218,18 @@ input[type=range]:active::-webkit-slider-thumb,input[type=range]:hover::-webkit-
 .rip{position:absolute;border-radius:50%;pointer-events:none;background:currentColor;opacity:.25;width:40px;height:40px;margin:-20px 0 0 -20px;animation:ripple .55s ease-out forwards}
 nav.tabs button,.seg button,.btn{position:relative;overflow:hidden}
 @media (prefers-reduced-motion: reduce){h1,.pane-in,.pane-in *,.svgbox.draw *,nav.tabs button,.seg button{animation:none!important}}
+
+/* ===== export bars, toast, builder ===== */
+.expbar{display:flex;justify-content:flex-end;gap:6px;margin-top:-4px}
+.expbar.top{margin:0 0 -6px}
+.xbtn{font:inherit;font-size:11.5px;font-weight:500;padding:2px 8px;border-radius:5px;border:1px solid var(--line-strong);background:var(--panel);color:var(--muted);cursor:pointer}
+.xbtn:hover{color:var(--ink);border-color:var(--accent)}
+#toast{position:fixed;left:50%;bottom:20px;transform:translate(-50%,20px);opacity:0;pointer-events:none;z-index:80;background:var(--ink);color:var(--panel);padding:8px 14px;border-radius:8px;font-size:13px;transition:opacity .2s,transform .2s;max-width:calc(100vw - 32px)}
+#toast.on{opacity:1;transform:translate(-50%,0)}
+.evrow{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;padding:6px 8px;border:1px solid var(--line);border-radius:6px}
+.evrow input[type=number]{width:4.6em}
+tr.cur td{background:var(--accent-soft)}
+#sharePop{box-shadow:0 18px 40px -10px var(--sh-lo),0 4px 10px var(--sh-lo2)}
 @media (max-width:700px){
   nav.tabs{flex-wrap:nowrap;overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:x proximity;scrollbar-width:none;margin:0 -16px;padding:8px 16px 10px;
     -webkit-mask-image:linear-gradient(90deg,#000 85%,transparent);mask-image:linear-gradient(90deg,#000 85%,transparent)}
@@ -234,6 +246,20 @@ nav.tabs button,.seg button,.btn{position:relative;overflow:hidden}
 <header class="top">
   <div>
     <h1>M-CSM Simulator</h1>
+    <div class="row" style="margin-top:10px;position:relative">
+      <button class="btn" type="button" id="shareBtn" aria-expanded="false" aria-controls="sharePop">Share settings</button>
+      <div id="sharePop" class="panel" hidden style="position:absolute;top:calc(100% + 8px);left:0;z-index:60;width:min(440px,calc(100vw - 32px))">
+        <h3>Share or save these settings</h3>
+        <p class="small muted">The link opens the simulator on GitHub with every input, rule, threshold, responsibility value and story restored.</p>
+        <input type="text" id="shareLink" readonly aria-label="Settings link" style="width:100%;font:inherit;font-size:12px;padding:5px 6px;border:1px solid var(--line-strong);border-radius:5px;background:var(--bg);color:var(--ink)">
+        <div class="row">
+          <button class="btn primary" type="button" id="shareCopy">Copy link</button>
+          <button class="btn" type="button" id="shareSave">Download settings file</button>
+          <label class="btn" for="shareLoad" style="display:inline-flex;align-items:center">Load settings file</label><input type="file" id="shareLoad" accept=".json,application/json" hidden>
+        </div>
+        <p class="small" id="shareMsg" aria-live="polite"></p>
+      </div>
+    </div>
   </div>
   <div class="modebar">
     <h3>Transition policy</h3>
@@ -255,6 +281,8 @@ nav.tabs button,.seg button,.btn{position:relative;overflow:hidden}
   <button role="tab" id="tab-roll" aria-selected="false" aria-controls="pane-roll">Rollout &amp; log</button>
   <button role="tab" id="tab-resp" aria-selected="false" aria-controls="pane-resp">Responsibility</button>
   <button role="tab" id="tab-scen" aria-selected="false" aria-controls="pane-scen">Scenario replay</button>
+  <button role="tab" id="tab-build" aria-selected="false" aria-controls="pane-build">Scenario builder</button>
+  <button role="tab" id="tab-cmp" aria-selected="false" aria-controls="pane-cmp">Rule comparison</button>
   <button role="tab" id="tab-p3" aria-selected="false" aria-controls="pane-p3">Responsibility drift</button>
   <button role="tab" id="tab-par" aria-selected="false" aria-controls="pane-par">Parameters &amp; notes</button>
 </nav>
@@ -426,11 +454,133 @@ nav.tabs button,.seg button,.btn{position:relative;overflow:hidden}
   </div>
   <div class="panel">
     <div class="row">
+      <button class="btn" type="button" id="sc-export">Download scenarios CSV</button>
+      <label class="btn" for="sc-import" style="display:inline-flex;align-items:center">Import scenarios CSV</label><input type="file" id="sc-import" accept=".csv,text/csv" hidden>
+      <button class="btn" type="button" id="sc-reset" hidden>Back to the 100 validation scenarios</button>
+      <span class="small muted" id="sc-setNote">The CSV uses the same columns for export and import, so you can download the set, edit or add rows, and load it back.</span>
+    </div>
+    <div class="row">
       <label class="small" for="sc-fam">Family</label><select id="sc-fam"></select>
       <label class="small" for="sc-state">Stable state</label><select id="sc-state"></select>
       <span class="small muted" id="sc-shown"></span>
     </div>
     <div class="tablebox" style="max-height:640px;overflow:auto"><table id="sc-table"></table></div>
+  </div>
+</div>
+</section>
+
+<!-- ============ SCENARIO BUILDER ============ -->
+<section id="pane-build" role="tabpanel" aria-labelledby="tab-build" hidden>
+<div class="grid">
+  <aside class="rail">
+    <div class="panel">
+      <h2>Scenario builder</h2>
+      <p class="small muted">Script how the context changes over time, then watch each transition rule respond epoch by epoch. All four rules see exactly the same inputs.</p>
+      <div class="group">
+        <h3>Story</h3>
+        <select id="b-preset" aria-label="Story preset"></select>
+        <p class="small muted" id="b-presetNote"></p>
+      </div>
+      <div class="row">
+        <label class="small" for="b-T">Epochs</label><input type="number" id="b-T" min="2" max="200" step="1">
+        <label class="small" for="b-q0">Start</label><select id="b-q0" aria-label="Start state"></select>
+      </div>
+      <div class="group">
+        <h3>Baseline context</h3>
+        <p class="small muted" id="b-baseNote"></p>
+        <button class="btn" type="button" id="b-base">Use inputs from Decision epoch tab</button>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="row" style="justify-content:space-between"><h3>Changes over time</h3><button class="btn" type="button" id="b-add">Add change</button></div>
+      <p class="small muted">From the given epoch the input moves to the new value, at once (ramp 0) or in a straight line over the ramp epochs. FC and HO switch to 0 or 1.</p>
+      <div id="b-events" class="group"></div>
+      <div class="row">
+        <button class="btn" type="button" id="b-export">Download story CSV</button>
+        <label class="btn" for="b-import" style="display:inline-flex;align-items:center">Import story CSV</label><input type="file" id="b-import" accept=".csv,text/csv" hidden>
+      </div>
+      <p class="small" id="b-msg" aria-live="polite"></p>
+    </div>
+  </aside>
+  <div class="rail">
+    <div class="panel">
+      <div class="row" style="justify-content:space-between">
+        <div class="row"><button class="btn primary" type="button" id="b-play">Play</button>
+          <label class="small" for="b-cursor">Epoch</label><input type="range" id="b-cursor" min="0" max="19" step="1" style="width:180px"><output id="b-cursorOut" class="mono small"></output></div>
+        <button class="btn" type="button" id="b-open">Open this epoch in Decision epoch</button>
+      </div>
+      <h3>Authority state under each rule</h3>
+      <div class="svgbox"><svg id="b-strip" viewBox="0 0 640 150" role="img" aria-label="State per epoch for each rule"></svg></div>
+      <div class="legend" id="b-legend"></div>
+    </div>
+    <div class="panel">
+      <h3>Δ = S<sub>M</sub> − S<sub>H</sub> against the thresholds</h3>
+      <div class="svgbox"><svg id="b-delta" viewBox="0 0 640 220" role="img" aria-label="Strength gap over time"></svg></div>
+      <div class="legend"><span><span class="sw" style="background:var(--st-M)"></span>θ<sub>M</sub> and above: machine stronger</span><span><span class="sw" style="background:var(--st-HM)"></span>|Δ| &lt; ε: balanced</span><span><span class="sw" style="background:var(--st-H)"></span>−θ<sub>H</sub> and below: human stronger</span></div>
+    </div>
+    <div class="panel">
+      <h3>Inputs that change</h3>
+      <div class="svgbox"><svg id="b-inputs" viewBox="0 0 640 200" role="img" aria-label="Scripted inputs over time"></svg></div>
+      <div class="legend" id="b-inLegend"></div>
+    </div>
+    <div class="panel">
+      <h3>Summary</h3>
+      <div class="kpis" id="b-kpis"></div>
+    </div>
+    <div class="panel">
+      <h3>Epoch by epoch</h3>
+      <div class="tablebox" style="max-height:520px;overflow:auto"><table id="b-table"></table></div>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ============ RULE COMPARISON ============ -->
+<section id="pane-cmp" role="tabpanel" aria-labelledby="tab-cmp" hidden>
+<div class="rail">
+  <div class="panel">
+    <h2>Rule comparison lab</h2>
+    <p class="muted small" style="max-width:80ch">Draws many random contexts, applies all four transition rules to each one, and compares the results: how often each rule selects a state that constraints (4)–(7) forbid, how often the rules disagree, and where repeated epochs settle. Every continuous input is drawn uniformly from 0 to 1; HO and FC are 1 with the probabilities set here. Weights and thresholds come from the Parameters tab. The seed makes a run exactly repeatable.</p>
+    <div class="row">
+      <label class="small" for="c-n">Contexts</label>
+      <select id="c-n"><option value="2000">2,000</option><option value="10000" selected>10,000</option><option value="50000">50,000</option><option value="200000">200,000</option></select>
+      <label class="small" for="c-q">Current state</label><select id="c-q"></select>
+      <label class="small" for="c-ho">P(HO = 1)</label><input type="number" id="c-ho" min="0" max="1" step="0.05" value="0.1">
+      <label class="small" for="c-fc">P(FC = 1)</label><input type="number" id="c-fc" min="0" max="1" step="0.05" value="0.1">
+      <label class="small" for="c-seed">Seed</label><input type="number" id="c-seed" step="1" value="2026">
+      <button class="btn primary" type="button" id="c-run">Run</button>
+      <span class="small muted" id="c-status" aria-live="polite"></span>
+    </div>
+    <div class="kpis" id="c-kpis"></div>
+  </div>
+  <div class="twocol">
+    <div class="panel">
+      <h3>Next state chosen by each rule</h3>
+      <div class="svgbox"><svg id="c-dist" viewBox="0 0 600 220" role="img" aria-label="Distribution of next states per rule"></svg></div>
+      <div class="legend" id="c-distLegend"></div>
+    </div>
+    <div class="panel">
+      <h3>Forbidden results, by the constraint that forbids them</h3>
+      <div class="svgbox"><svg id="c-viol" viewBox="0 0 600 220" role="img" aria-label="Forbidden results by constraint"></svg></div>
+      <p class="small muted">Share of all contexts in which the rule picks a state excluded by that constraint. Human fallback replaces such results with S<sub>H</sub>, so it is shown before the replacement.</p>
+    </div>
+  </div>
+  <div class="twocol">
+    <div class="panel">
+      <h3>How often two rules disagree</h3>
+      <div class="tablebox"><table id="c-dis"></table></div>
+      <p class="small muted">Percentage of contexts in which the two rules choose a different next state.</p>
+    </div>
+    <div class="panel">
+      <h3>Where repeated epochs settle</h3>
+      <div class="tablebox"><table id="c-stable"></table></div>
+      <p class="small muted">Each context is held fixed and the epoch repeated from the chosen current state until the state stops changing (at most 20 epochs), as on the Rollout tab.</p>
+    </div>
+  </div>
+  <div class="panel">
+    <h3>Most common disagreements: published rule vs admissibility-preserving rule</h3>
+    <div class="tablebox"><table id="c-pairs"></table></div>
+    <div class="row"><button class="btn" type="button" id="c-samples">Download sampled contexts (CSV)</button><span class="small muted">Every context with the next state under each rule; up to 50,000 rows.</span></div>
   </div>
 </div>
 </section>
@@ -510,7 +660,7 @@ nav.tabs button,.seg button,.btn{position:relative;overflow:hidden}
       <li>S<sub>N</sub> is nearly absorbing. From negotiation, a clear human advantage (Δ ≤ −θ<sub>H</sub>) or machine advantage (Δ ≥ θ<sub>M</sub>) leaves the state at S<sub>N</sub>; only |Δ| &lt; ε (to S<sub>HM</sub>) or line 3 (to S<sub>H</sub>) leaves it. “Recovery” has no rule of its own.</li>
       <li>S<sub>HM</sub> has no direct exit to S<sub>H</sub> or S<sub>M</sub>: any clear advantage sends it to S<sub>N</sub>, where it then stays.</li>
       <li>An interrupted handover does not reverse: S<sub>H→M</sub> with a human advantage, and S<sub>M→H</sub> with a machine advantage, both go to S<sub>N</sub>.</li>
-      <li>On 200,000 random contexts, the published rule returned an excluded state in 8.2 % of cases (compact rule: 3.1 %), and the two policies disagreed in 25.3 %.</li>
+      <li>On 200,000 random contexts (random current state; HO and FC each 1 with probability 0.1), the published rule returned an excluded state in 8.0 % of cases (compact rule: 3.0 %), and the two policies disagreed in 25.1 %. The Rule comparison tab reproduces these figures exactly with 200,000 contexts and seed 2026, and lets you vary the sampling.</li>
     </ul>
     <p><b>Admissibility-preserving rule.</b> A proposed correction that keeps the paper's states, inputs, constraints and thresholds, and changes only the transition rule:</p>
     <ul>
@@ -913,7 +1063,7 @@ function fillRange(r){ var lo=parseFloat(r.min||0), hi=parseFloat(r.max||100), v
 function fillAllRanges(){ Array.prototype.forEach.call(document.querySelectorAll('input[type=range]'), fillRange); }
 document.addEventListener('input', function(e){ if (e.target && e.target.type==='range') fillRange(e.target); }, true);
 /* ---------- tabs ---------- */
-var TABS = ['epoch','land','roll','resp','scen','p3','par'];
+var TABS = ['epoch','land','roll','resp','scen','build','cmp','p3','par'];
 function showTab(t){
   S.tab = t;
   TABS.forEach(function(k){ $('tab-'+k).setAttribute('aria-selected', k===t ? 'true':'false'); $('pane-'+k).hidden = k!==t; });
@@ -1253,7 +1403,7 @@ $('respFollow').addEventListener('change', function(){ S.respFollow=this.checked
 $('respReset').addEventListener('click', function(){ S.presets[S.respState]=M.clone(M.RESP_PRESETS[S.respState]); render(); });
 function renderResp(fromInput){
   var P=S.presets[S.respState];
-  $('respNote').textContent = S.loaded ? 'Loaded from scenario '+S.loaded+'. The notebook derives these factors from the scenario text and family profile only, so every regime uses the same values. “Reload preset” restores the illustrative value for this regime.' : 'The paper gives no default values for χ, a, k, f or d. These presets are illustrative placeholders; replace them with your own.';
+  $('respNote').textContent = S.loaded ? 'Loaded from scenario '+S.loaded.id+'. The notebook derives these factors from the scenario text and family profile only, so every regime uses the same values. “Reload preset” restores the illustrative value for this regime.' : 'The paper gives no default values for χ, a, k, f or d. These presets are illustrative placeholders; replace them with your own.';
   $('respState').value=S.respState;
   if (!fromInput) ['H','M','G'].forEach(function(i){ FACT.forEach(function(f){ $('rf-'+i+'-'+f[0]).value=P[i][f[0]]; }); });
   ySync.sync();
@@ -1372,34 +1522,35 @@ var REPORTED = {S_H:26,S_HM:45,S_N:28,S_M:1};
   M.STATES.forEach(function(s){ var o=document.createElement('option'); o.value=s; o.textContent=TXT[s]+' — '+M.STATE_LABEL[s]; st.appendChild(o); });
   f.addEventListener('change',render); st.addEventListener('change',render);
   $('sc-table').addEventListener('click',function(e){
-    var b=e.target.closest('button[data-sid]'); if(!b) return;
-    var sc=SCENARIOS[+b.getAttribute('data-sid')-1];
-    S.x=M.clone(sc.x); S.q='S_H'; S.y=sc.y; S.loaded=sc.id;
-    M.STATES.forEach(function(st){ S.presets[st]=M.clone(sc.P); });
+    var b=e.target.closest('button[data-idx]'); if(!b) return;
+    var sc=SCEN_ACTIVE[+b.getAttribute('data-idx')];
+    S.x=M.clone(sc.x); S.q='S_H'; if (sc.y!=null) S.y=sc.y; S.loaded=sc;
+    if (sc.P) M.STATES.forEach(function(st){ S.presets[st]=M.clone(sc.P); });
     showTab('epoch');
   });
 })();
 function replayOne(sc){
   var q='S_H', first=null, viol=false;
   for (var k=0;k<4;k++){ var r=M.step(q,sc.x,S.p,S.mode); if(first===null) first=r; if(r.violation) viol=true; if(r.next===q) break; q=r.next; }
-  return { one:first, stable:q, viol:viol, resp:M.responsibility(sc.P,sc.y,S.p) };
+  return { one:first, stable:q, viol:viol, resp:M.responsibility(sc.P||S.presets[q],sc.y!=null?sc.y:S.y,S.p) };
 }
 function renderScen(){
-  var res=SCENARIOS.map(replayOne), counts={}, match=0, mH=0,mM=0,mG=0;
-  res.forEach(function(r,i){ counts[r.stable]=(counts[r.stable]||0)+1; if(r.stable===SCENARIOS[i].os && r.one.next===SCENARIOS[i].o1) match++; mH+=r.resp.rows.H.R; mM+=r.resp.rows.M.R; mG+=r.resp.rows.G.R; });
-  $('sc-match').className='pill '+(match===100?'good':'bad');
-  $('sc-match').textContent=match+' / 100 match the notebook';
+  var res=SCEN_ACTIVE.map(replayOne), counts={}, match=0, mH=0,mM=0,mG=0;
+  res.forEach(function(r,i){ counts[r.stable]=(counts[r.stable]||0)+1; if(r.stable===SCEN_ACTIVE[i].os && r.one.next===SCEN_ACTIVE[i].o1) match++; mH+=r.resp.rows.H.R; mM+=r.resp.rows.M.R; mG+=r.resp.rows.G.R; });
+  var NS_=SCEN_ACTIVE.length;
+  $('sc-match').className='pill '+(SCEN_CUSTOM?'':(match===100?'good':'bad'));
+  $('sc-match').textContent=SCEN_CUSTOM?NS_+' imported scenario'+(NS_===1?'':'s'):match+' / 100 match the notebook';
   $('sc-kpis').innerHTML=['S_H','S_HM','S_N','S_M','S_HtoM','S_MtoH'].map(function(s){ var n=counts[s]||0, rep=REPORTED[s]||0;
-    return '<div class="kpi"><h3><span class="sw" style="background:'+SCOL[s]+'"></span>'+TXT[s]+'</h3><span class="v">'+n+'</span><span class="small muted">paper: '+rep+(n!==rep?' · <b style="color:var(--warn)">'+(n>rep?'+':'')+(n-rep)+'</b>':'')+'</span></div>'; }).join('')+
-    '<div class="kpi"><h3>Mean responsibility</h3><span class="v" style="font-size:15px">'+(mH).toFixed(1)+' / '+(mM).toFixed(1)+' / '+(mG).toFixed(1)+'%</span><span class="small muted">human / machine / supervisor · paper 63.3 / 23.3 / 13.4</span></div>';
-  var c={HO:0,FC:0,ER:0,VA:0,TC:0}; SCENARIOS.forEach(function(sc){ if(sc.x.HO) c.HO++; if(sc.x.FC) c.FC++; if(sc.x.ER>=S.p.rho) c.ER++; if(sc.x.VA_HM<S.p.tau) c.VA++; if(sc.x.TC>=S.p.kappa) c.TC++; });
-  var maxER=Math.max.apply(null,SCENARIOS.map(function(s){return s.x.ER;})), maxTC=Math.max.apply(null,SCENARIOS.map(function(s){return s.x.TC;}));
-  $('sc-constraints').innerHTML='Constraint activity in this corpus: HO = 1 in <b>'+c.HO+'</b> cases, FC = 1 in <b>'+c.FC+'</b>, ER ≥ ρ in <b>'+c.ER+'</b> (max ER '+maxER.toFixed(3)+'), VA<sub>HM</sub> &lt; τ in <b>'+c.VA+'</b>, TC ≥ κ in <b>'+c.TC+'</b> (max TC '+maxTC.toFixed(3)+').'+(c.ER+c.VA+c.TC===0?' Three of the four exclusions never fire, so the validation does not exercise them.':'');
+    return '<div class="kpi"><h3><span class="sw" style="background:'+SCOL[s]+'"></span>'+TXT[s]+'</h3><span class="v">'+n+'</span><span class="small muted">'+(SCEN_CUSTOM?(100*n/NS_).toFixed(0)+' % of the set':'paper: '+rep+(n!==rep?' · <b style="color:var(--warn)">'+(n>rep?'+':'')+(n-rep)+'</b>':''))+'</span></div>'; }).join('')+
+    '<div class="kpi"><h3>Mean responsibility</h3><span class="v" style="font-size:15px">'+(100*mH/NS_).toFixed(1)+' / '+(100*mM/NS_).toFixed(1)+' / '+(100*mG/NS_).toFixed(1)+'%</span><span class="small muted">human / machine / supervisor'+(SCEN_CUSTOM?'':' · paper 63.3 / 23.3 / 13.4')+'</span></div>';
+  var c={HO:0,FC:0,ER:0,VA:0,TC:0}; SCEN_ACTIVE.forEach(function(sc){ if(sc.x.HO) c.HO++; if(sc.x.FC) c.FC++; if(sc.x.ER>=S.p.rho) c.ER++; if(sc.x.VA_HM<S.p.tau) c.VA++; if(sc.x.TC>=S.p.kappa) c.TC++; });
+  var maxER=Math.max.apply(null,SCEN_ACTIVE.map(function(s){return s.x.ER;})), maxTC=Math.max.apply(null,SCEN_ACTIVE.map(function(s){return s.x.TC;}));
+  $('sc-constraints').innerHTML='Constraint activity in this '+(SCEN_CUSTOM?'set':'corpus')+': HO = 1 in <b>'+c.HO+'</b> cases, FC = 1 in <b>'+c.FC+'</b>, ER ≥ ρ in <b>'+c.ER+'</b> (max ER '+maxER.toFixed(3)+'), VA<sub>HM</sub> &lt; τ in <b>'+c.VA+'</b>, TC ≥ κ in <b>'+c.TC+'</b> (max TC '+maxTC.toFixed(3)+').'+(c.ER+c.VA+c.TC===0?' Three of the four exclusions never fire, so the validation does not exercise them.':'');
   var ff=$('sc-fam').value, fs=$('sc-state').value, shown=0;
-  var rows=SCENARIOS.map(function(sc,i){ var r=res[i]; if((ff&&sc.f!==ff)||(fs&&r.stable!==fs)) return ''; shown++;
+  var rows=SCEN_ACTIVE.map(function(sc,i){ var r=res[i]; if((ff&&sc.f!==ff)||(fs&&r.stable!==fs)) return ''; shown++;
     var ok=r.stable===sc.os&&r.one.next===sc.o1;
     var flags=(sc.x.HO?'HO ':'')+(sc.x.FC?'FC':'');
-    return '<tr><td class="n">'+sc.id+'</td><td class="mono">'+sc.f+'</td><td style="white-space:normal;min-width:16em">'+sc.t+'</td><td class="n">'+fmt(r.one.delta)+'</td><td class="mono small">'+(flags||'—')+'</td><td>'+SHORT[r.one.next]+'<br><span class="small muted">'+ruleReason(S.mode,r.one)+'</span></td><td><span class="sw" style="background:'+SCOL[r.stable]+'"></span>'+SHORT[r.stable]+(r.viol?' <span class="pill bad">excluded</span>':'')+'</td><td class="n">'+(100*r.resp.rows.H.R).toFixed(1)+'</td><td class="n">'+(100*r.resp.rows.M.R).toFixed(1)+'</td><td class="n">'+(100*r.resp.rows.G.R).toFixed(1)+'</td><td>'+(ok?'<span style="color:var(--ok)">✓</span>':'<span style="color:var(--warn)">'+TXT[sc.os]+'</span>')+'</td><td><button class="btn" type="button" data-sid="'+sc.id+'">Open</button></td></tr>'; }).join('');
+    return '<tr><td class="n">'+sc.id+'</td><td class="mono">'+sc.f+'</td><td style="white-space:normal;min-width:16em">'+sc.t+'</td><td class="n">'+fmt(r.one.delta)+'</td><td class="mono small">'+(flags||'—')+'</td><td>'+SHORT[r.one.next]+'<br><span class="small muted">'+ruleReason(S.mode,r.one)+'</span></td><td><span class="sw" style="background:'+SCOL[r.stable]+'"></span>'+SHORT[r.stable]+(r.viol?' <span class="pill bad">excluded</span>':'')+'</td><td class="n">'+(100*r.resp.rows.H.R).toFixed(1)+'</td><td class="n">'+(100*r.resp.rows.M.R).toFixed(1)+'</td><td class="n">'+(100*r.resp.rows.G.R).toFixed(1)+'</td><td>'+(!sc.os?'—':ok?'<span style="color:var(--ok)">✓</span>':'<span style="color:var(--warn)">'+TXT[sc.os]+'</span>')+'</td><td><button class="btn" type="button" data-idx="'+i+'">Open</button></td></tr>'; }).join('');
   $('sc-shown').textContent=shown+' shown';
   $('sc-table').innerHTML='<thead><tr><th>#</th><th>Fam.</th><th>Scenario</th><th class="n">Δ</th><th>Flags</th><th>One step</th><th>Stable</th><th class="n">R<sub>H</sub> %</th><th class="n">R<sub>M</sub> %</th><th class="n">R<sub>G</sub> %</th><th>Notebook</th><th></th></tr></thead><tbody>'+rows+'</tbody>';
 }
@@ -1445,7 +1596,7 @@ function computeLand(){
 }
 function drawLand(){
   var cv=$('land'); if (!LAND.grid) return;
-  var dpr=window.devicePixelRatio||1, W=cv.clientWidth, H=cv.clientHeight;
+  var dpr=LAND.exportScale||window.devicePixelRatio||1, W=cv.clientWidth, H=cv.clientHeight;
   if (cv.width!==Math.round(W*dpr)||cv.height!==Math.round(H*dpr)){ cv.width=Math.round(W*dpr); cv.height=Math.round(H*dpr); }
   var g=cv.getContext('2d'); g.setTransform(dpr,0,0,dpr,0,0); g.clearRect(0,0,W,H);
   var G=LAND.grid, N=LAND.N, ink=cssColor('--ink'), muted=cssColor('--muted'), line=cssColor('--line-strong');
@@ -1540,12 +1691,511 @@ function matchExample(){
   for (var i=0;i<EXAMPLES.length;i++){ var e=EXAMPLES[i], same=true; for (var k in e.x) if (Math.abs(e.x[k]-S.x[k])>1e-9){ same=false; break; } if (same) return i; }
   return -1;
 }
+
+/* =====================================================================
+   Export helpers: files, CSV, chart images
+   ===================================================================== */
+var MODES=[['literal','Published'],['enforced','Human fallback'],['eq8','Compact'],['revised','Admissibility-preserving']];
+var ALL_KEYS=['CP_H','TR_H','VA_H','UC_H','CP_M','TR_M','VA_M','UC_M','VA_HM','ER','TC','FC','HO'];
+var DL=null, dlReady=null;
+function getDL(){
+  if (dlReady) return dlReady;
+  dlReady = (window.claude && typeof window.claude.use==='function') ? window.claude.use('downloads').then(function(d){ DL=d; return d; }, function(){ return null; }) : Promise.resolve(null);
+  return dlReady;
+}
+getDL();
+function toast(msg){
+  var t=$('toast'); if(!t){ t=document.createElement('div'); t.id='toast'; t.setAttribute('role','status'); document.body.appendChild(t); }
+  t.textContent=msg; t.classList.add('on'); clearTimeout(t._h); t._h=setTimeout(function(){ t.classList.remove('on'); },2600);
+}
+function anchorSave(name,blob){
+  var u=URL.createObjectURL(blob), a=document.createElement('a'); a.href=u; a.download=name; document.body.appendChild(a); a.click();
+  setTimeout(function(){ URL.revokeObjectURL(u); a.remove(); },1500);
+}
+function saveFile(name,data,type){
+  var blob = data instanceof Blob ? data : new Blob([data],{type:type||'text/plain'});
+  return getDL().then(function(d){
+    if (!d){ anchorSave(name,blob); return; }
+    return d.save({filename:name,data:blob}).then(function(){ toast('Saved '+name); }, function(e){
+      var c=e&&e.code;
+      if (c==='declined') toast('Download cancelled');
+      else if (c==='rate_limited') toast('Another download is waiting for confirmation');
+      else anchorSave(name,blob);
+    });
+  });
+}
+function csvCell(v){ v=v==null?'':String(v); return /[",\n\r]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; }
+function toCSV(rows){ return rows.map(function(r){ return r.map(csvCell).join(','); }).join('\r\n')+'\r\n'; }
+function parseCSV(text){
+  var rows=[], row=[], cur='', q=false, i=0; text=text.replace(/^﻿/,'');
+  for (; i<text.length; i++){
+    var ch=text[i];
+    if (q){ if (ch==='"'){ if (text[i+1]==='"'){ cur+='"'; i++; } else q=false; } else cur+=ch; }
+    else if (ch==='"') q=true;
+    else if (ch===','){ row.push(cur); cur=''; }
+    else if (ch==='\n'||ch==='\r'){ if (ch==='\r'&&text[i+1]==='\n') i++; row.push(cur); cur=''; if (row.length>1||row[0]!=='') rows.push(row); row=[]; }
+    else cur+=ch;
+  }
+  if (cur!==''||row.length){ row.push(cur); if (row.length>1||row[0]!=='') rows.push(row); }
+  return rows;
+}
+function readFile(input,cb){ var f=input.files&&input.files[0]; if(!f) return; var r=new FileReader(); r.onload=function(){ input.value=''; cb(String(r.result),f.name); }; r.readAsText(f); }
+function tableCSV(t){
+  var rows=[];
+  Array.prototype.forEach.call(t.querySelectorAll('tr'),function(tr){
+    var cells=[]; Array.prototype.forEach.call(tr.children,function(td){ if (td.querySelector('button')&&!td.textContent.replace(td.querySelector('button').textContent,'').trim()) return; cells.push(td.textContent.replace(/\s+/g,' ').trim()); });
+    if (cells.length) rows.push(cells);
+  });
+  return toCSV(rows);
+}
+var ROOT_STYLE=null;
+function cssVarResolve(v){
+  if (!v || v.indexOf('var(')<0) return v;
+  ROOT_STYLE=ROOT_STYLE||getComputedStyle(document.documentElement);
+  return v.replace(/var\((--[\w-]+)\)/g,function(m,n){ return ROOT_STYLE.getPropertyValue(n).trim()||'#000'; });
+}
+function svgForExport(svg){
+  ROOT_STYLE=getComputedStyle(document.documentElement);
+  var vb=svg.viewBox.baseVal, w=vb&&vb.width?vb.width:svg.clientWidth, h=vb&&vb.height?vb.height:svg.clientHeight;
+  var c=svg.cloneNode(true);
+  c.setAttribute('xmlns','http://www.w3.org/2000/svg'); c.setAttribute('width',w); c.setAttribute('height',h);
+  c.removeAttribute('class'); c.removeAttribute('style');
+  var orig=svg.querySelectorAll('*'), copy=c.querySelectorAll('*');
+  for (var i=0;i<copy.length;i++){
+    var e=copy[i];
+    ['fill','stroke','stop-color','color'].forEach(function(a){ var v=e.getAttribute(a); if (v) e.setAttribute(a,cssVarResolve(v)); });
+    if (e.getAttribute('style')) e.setAttribute('style',cssVarResolve(e.getAttribute('style')));
+    if (e.tagName==='text'){
+      var cs=getComputedStyle(orig[i]);
+      e.setAttribute('font-family',cs.fontFamily); if (!e.getAttribute('fill')) e.setAttribute('fill',cs.fill&&cs.fill!=='none'?cs.fill:ROOT_STYLE.getPropertyValue('--ink').trim());
+      if (!e.getAttribute('font-size')) e.setAttribute('font-size',cs.fontSize);
+    }
+    e.removeAttribute('class');
+  }
+  var bg=document.createElementNS(NS,'rect'); bg.setAttribute('x',vb?vb.x:0); bg.setAttribute('y',vb?vb.y:0); bg.setAttribute('width',w); bg.setAttribute('height',h); bg.setAttribute('fill',ROOT_STYLE.getPropertyValue('--panel').trim());
+  c.insertBefore(bg,c.firstChild);
+  return {text:'<?xml version="1.0" encoding="UTF-8"?>\n'+new XMLSerializer().serializeToString(c), w:w, h:h};
+}
+function svgToPNG(svg,scale,cb){
+  var s=svgForExport(svg), img=new Image();
+  img.onload=function(){ var cv=document.createElement('canvas'); cv.width=Math.round(s.w*scale); cv.height=Math.round(s.h*scale); var g=cv.getContext('2d'); g.drawImage(img,0,0,cv.width,cv.height); cv.toBlob(cb,'image/png'); };
+  img.onerror=function(){ toast('Could not render this chart as PNG'); };
+  img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(s.text);
+}
+function landPNG(cb){
+  var cv=$('land'); LAND.exportScale=3; drawLand();
+  var out=document.createElement('canvas'); out.width=cv.width; out.height=cv.height; var g=out.getContext('2d');
+  g.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--panel').trim(); g.fillRect(0,0,out.width,out.height); g.drawImage(cv,0,0);
+  LAND.exportScale=null; drawLand(); out.toBlob(cb,'image/png');
+}
+function fileStem(id){ return 'mcsm-'+id+'-'+(S.tab||'view'); }
+function addExportBars(){
+  Array.prototype.forEach.call(document.querySelectorAll('.svgbox'),function(box){
+    var svg=box.querySelector('svg'); if (!svg||box.nextElementSibling&&box.nextElementSibling.classList.contains('expbar')) return;
+    var bar=document.createElement('div'); bar.className='expbar';
+    bar.innerHTML='<button type="button" class="xbtn" data-k="png">PNG</button><button type="button" class="xbtn" data-k="svg">SVG</button>';
+    bar.addEventListener('click',function(e){ var b=e.target.closest('button'); if(!b) return;
+      if (b.getAttribute('data-k')==='svg') saveFile('mcsm-'+svg.id+'.svg',svgForExport(svg).text,'image/svg+xml');
+      else svgToPNG(svg,3,function(blob){ if(blob) saveFile('mcsm-'+svg.id+'.png',blob); }); });
+    box.parentNode.insertBefore(bar,box.nextSibling);
+  });
+  var cv=$('land'), wrap=cv.parentNode;
+  if (!(wrap.nextElementSibling&&wrap.nextElementSibling.classList.contains('expbar'))){
+    var b2=document.createElement('div'); b2.className='expbar'; b2.innerHTML='<button type="button" class="xbtn">PNG</button>';
+    b2.addEventListener('click',function(){ landPNG(function(blob){ if(blob) saveFile('mcsm-strength-landscape.png',blob); }); });
+    wrap.parentNode.insertBefore(b2,wrap.nextSibling);
+  }
+  Array.prototype.forEach.call(document.querySelectorAll('.tablebox'),function(tb){
+    var t=tb.querySelector('table'); if (!t||tb.previousElementSibling&&tb.previousElementSibling.classList.contains('expbar')) return;
+    var bar=document.createElement('div'); bar.className='expbar top'; bar.innerHTML='<button type="button" class="xbtn">CSV</button>';
+    bar.addEventListener('click',function(){ if (!t.rows.length){ toast('This table is empty'); return; } saveFile('mcsm-'+t.id+'.csv',tableCSV(t),'text/csv'); });
+    tb.parentNode.insertBefore(bar,tb);
+  });
+}
+
+/* =====================================================================
+   Scenario builder
+   ===================================================================== */
+var STORY_PRESETS={
+  drop:{name:'Machine accuracy drops',note:'Machine capability falls at epoch 6, then its trustworthiness erodes over four epochs.',T:20,q0:'S_H',
+    events:[{t:6,key:'CP_M',v:.40,r:0},{t:8,key:'TR_M',v:.55,r:4}]},
+  pressure:{name:'Time-pressure spike',note:'Time criticality jumps above κ for epochs 5 to 9, which forbids handover and negotiation states.',T:20,q0:'S_H',
+    events:[{t:5,key:'TC',v:.90,r:0},{t:10,key:'TC',v:.40,r:0}]},
+  override:{name:'Human override pulse',note:'The human overrides at epoch 8 and releases at epoch 11.',T:20,q0:'S_H',
+    events:[{t:8,key:'HO',v:1,r:0},{t:11,key:'HO',v:0,r:0}]},
+  ethics:{name:'Ethical risk rises',note:'Ethical risk climbs past ρ between epochs 4 and 10.',T:20,q0:'S_H',
+    events:[{t:4,key:'ER',v:.85,r:6}]},
+  fatigue:{name:'Human fatigue',note:'Human capability falls and uncertainty rises slowly from epoch 3; the machine is weaker than in the default context.',T:24,q0:'S_H',
+    base:{CP_M:.80,TR_M:.80,UC_M:.20},events:[{t:3,key:'CP_H',v:.35,r:12},{t:3,key:'UC_H',v:.70,r:12}]},
+  recover:{name:'Recovery after negotiation',note:'A balanced but ambiguous start, then the machine becomes clearly stronger at epoch 6 and weaker again at epoch 13.',T:20,q0:'S_N',
+    base:{CP_M:.85,TR_M:.85,UC_M:.15},events:[{t:6,key:'CP_M',v:.98,r:0},{t:13,key:'CP_M',v:.55,r:0}]},
+  empty:{name:'Baseline only (no changes)',note:'No scripted changes; add your own.',T:20,q0:'S_H',events:[]}
+};
+var BUILD={ T:20, q0:'S_H', base:M.clone(EXAMPLES[0].x), events:[], preset:'drop', cursor:null, playing:false, runs:null };
+function loadPreset(k){
+  var P=STORY_PRESETS[k]; BUILD.preset=k; BUILD.T=P.T; BUILD.q0=P.q0;
+  BUILD.base=Object.assign(M.clone(EXAMPLES[0].x),P.base||{});
+  BUILD.events=P.events.map(function(e){ return {t:e.t,key:e.key,v:e.v,r:e.r}; });
+  BUILD.cursor=null;
+}
+loadPreset('drop');
+function storyInputs(B){
+  var T=B.T, xs=[], ser={};
+  ALL_KEYS.forEach(function(k){ ser[k]=[]; for (var t=0;t<T;t++) ser[k][t]=B.base[k]; });
+  B.events.slice().sort(function(a,b){ return a.t-b.t; }).forEach(function(e){
+    var k=e.key, bin=(k==='FC'||k==='HO'), t0=Math.max(0,Math.min(T-1,Math.round(e.t))), from=t0>0?ser[k][t0-1]:B.base[k], r=bin?0:Math.max(0,Math.round(e.r||0));
+    var v=bin?(e.v>=0.5?1:0):M.clip01(+e.v);
+    for (var t=t0;t<T;t++) ser[k][t]= (r>0 && t<t0+r) ? from+(v-from)*(t-t0+1)/r : v;
+  });
+  for (var t=0;t<T;t++){ var x={}; ALL_KEYS.forEach(function(k){ x[k]=ser[k][t]; }); xs.push(x); }
+  return {xs:xs, ser:ser};
+}
+function runStory(){
+  var si=storyInputs(BUILD), runs={};
+  MODES.forEach(function(m){
+    var q=BUILD.q0, rows=[];
+    si.xs.forEach(function(x,t){ var r=M.step(q,x,S.p,m[0]); r.t=t; rows.push(r); q=r.next; });
+    runs[m[0]]=rows;
+  });
+  BUILD.si=si; BUILD.runs=runs; return runs;
+}
+(function buildBuilder(){
+  var ps=$('b-preset');
+  Object.keys(STORY_PRESETS).forEach(function(k){ var o=document.createElement('option'); o.value=k; o.textContent=STORY_PRESETS[k].name; ps.appendChild(o); });
+  var oc=document.createElement('option'); oc.value='custom'; oc.textContent='Custom story'; ps.appendChild(oc);
+  ps.addEventListener('change',function(){ if (this.value!=='custom'){ stopPlay(); loadPreset(this.value); renderBuild(); } });
+  fillStateSelect($('b-q0'));
+  $('b-q0').addEventListener('change',function(){ BUILD.q0=this.value; customStory(); renderBuild(); });
+  $('b-T').addEventListener('change',function(){ var v=Math.round(+this.value); if (v>=2&&v<=200){ BUILD.T=v; BUILD.cursor=null; customStory(); } renderBuild(); });
+  $('b-base').addEventListener('click',function(){ BUILD.base=M.clone(S.x); customStory(); renderBuild(); toast('Baseline copied from the Decision epoch tab'); });
+  $('b-add').addEventListener('click',function(){ BUILD.events.push({t:Math.min(BUILD.T-1,5),key:'CP_M',v:.5,r:0}); customStory(); renderBuild(); });
+  $('b-events').addEventListener('input',function(e){
+    var row=e.target.closest('[data-i]'); if(!row) return; var ev=BUILD.events[+row.getAttribute('data-i')], f=e.target.getAttribute('data-f'), v=e.target.value;
+    if (f==='key'){ ev.key=v; if (v==='FC'||v==='HO'){ ev.v=ev.v>=.5?1:0; ev.r=0; } }
+    else { var n=parseFloat(v); if (isNaN(n)) return; ev[f]=n; }
+    customStory(); renderBuild(true);
+  });
+  $('b-events').addEventListener('click',function(e){ var b=e.target.closest('button[data-del]'); if(!b) return; BUILD.events.splice(+b.getAttribute('data-del'),1); customStory(); renderBuild(); });
+  $('b-cursor').addEventListener('input',function(){ stopPlay(); BUILD.cursor=+this.value; drawBuild(); });
+  $('b-play').addEventListener('click',function(){ if (BUILD.playing) stopPlay(); else startPlay(); });
+  $('b-open').addEventListener('click',function(){
+    if (!BUILD.runs) return; var t=BUILD.cursor==null?BUILD.T-1:BUILD.cursor, r=BUILD.runs[S.mode][t];
+    S.x=M.clone(BUILD.si.xs[t]); S.q=r.q; showTab('epoch'); toast('Epoch '+t+' opened: context and current state under the selected rule');
+  });
+  $('b-export').addEventListener('click',function(){
+    var rows=[['type','epoch','input','value','ramp']];
+    rows.push(['setting','','epochs',BUILD.T,'']); rows.push(['setting','','start',BUILD.q0,'']);
+    ALL_KEYS.forEach(function(k){ rows.push(['base','',k,BUILD.base[k],'']); });
+    BUILD.events.forEach(function(e){ rows.push(['change',e.t,e.key,e.v,e.r]); });
+    saveFile('mcsm-story.csv',toCSV(rows),'text/csv');
+  });
+  $('b-import').addEventListener('change',function(){ readFile(this,function(txt){
+    try{
+      var rows=parseCSV(txt), h=rows.shift().map(function(s){return s.trim().toLowerCase();}), ix=function(n){ return h.indexOf(n); };
+      if (ix('type')<0||ix('input')<0||ix('value')<0) throw new Error('needs the columns type, epoch, input, value, ramp');
+      var B={T:BUILD.T,q0:BUILD.q0,base:M.clone(BUILD.base),events:[]};
+      rows.forEach(function(r,n){
+        var ty=(r[ix('type')]||'').trim().toLowerCase(), k=(r[ix('input')]||'').trim(), val=(r[ix('value')]||'').trim();
+        if (ty==='setting'){ if (k==='epochs') B.T=Math.max(2,Math.min(200,Math.round(+val))); else if (k==='start'){ if (M.STATES.indexOf(val)<0) throw new Error('row '+(n+2)+': unknown start state '+val); B.q0=val; } }
+        else if (ty==='base'||ty==='change'){
+          if (ALL_KEYS.indexOf(k)<0) throw new Error('row '+(n+2)+': unknown input '+k);
+          var v=parseFloat(val); if (isNaN(v)) throw new Error('row '+(n+2)+': value is not a number');
+          if (ty==='base') B.base[k]=(k==='FC'||k==='HO')?(v>=.5?1:0):M.clip01(v);
+          else B.events.push({t:Math.round(+r[ix('epoch')]||0),key:k,v:v,r:ix('ramp')>=0?(+r[ix('ramp')]||0):0});
+        }
+      });
+      stopPlay(); BUILD.T=B.T; BUILD.q0=B.q0; BUILD.base=B.base; BUILD.events=B.events; BUILD.cursor=null; customStory();
+      $('b-msg').textContent='Imported '+B.events.length+' change'+(B.events.length===1?'':'s')+'.'; renderBuild();
+    }catch(err){ $('b-msg').textContent='Could not import: '+err.message; }
+  }); });
+})();
+function customStory(){ BUILD.preset='custom'; }
+function stopPlay(){ BUILD.playing=false; clearInterval(BUILD._iv); $('b-play').textContent='Play'; }
+function startPlay(){
+  if (!BUILD.runs) return; BUILD.playing=true; $('b-play').textContent='Pause';
+  if (BUILD.cursor==null||BUILD.cursor>=BUILD.T-1) BUILD.cursor=0;
+  drawBuild();
+  BUILD._iv=setInterval(function(){ if (BUILD.cursor>=BUILD.T-1){ stopPlay(); drawBuild(); return; } BUILD.cursor++; drawBuild(); },REDUCED?250:480);
+}
+function renderBuild(fromEditor){
+  $('b-preset').value=BUILD.preset; $('b-T').value=BUILD.T; $('b-q0').value=BUILD.q0;
+  var P=STORY_PRESETS[BUILD.preset]; $('b-presetNote').textContent=P?P.note:'Edited by hand.';
+  var diff=ALL_KEYS.filter(function(k){ return Math.abs(BUILD.base[k]-S.x[k])>1e-9; });
+  $('b-baseNote').textContent= diff.length ? 'Fixed for this story; differs from the Decision epoch tab in '+diff.join(', ')+'.' : 'Same as the inputs on the Decision epoch tab.';
+  if (!fromEditor){
+    $('b-events').innerHTML = BUILD.events.length ? BUILD.events.map(function(e,i){
+      var bin=e.key==='FC'||e.key==='HO';
+      return '<div class="evrow" data-i="'+i+'"><label class="small">at <input type="number" data-f="t" min="0" max="'+(BUILD.T-1)+'" step="1" value="'+e.t+'" aria-label="Epoch"></label>'+
+        '<select data-f="key" aria-label="Input">'+ALL_KEYS.map(function(k){ return '<option'+(k===e.key?' selected':'')+'>'+k+'</option>'; }).join('')+'</select>'+
+        '<label class="small">→ <input type="number" data-f="v" min="0" max="1" step="'+(bin?1:0.05)+'" value="'+e.v+'" aria-label="New value"></label>'+
+        '<label class="small">ramp <input type="number" data-f="r" min="0" max="200" step="1" value="'+e.r+'" aria-label="Ramp epochs"'+(bin?' disabled':'')+'></label>'+
+        '<button type="button" class="xbtn" data-del="'+i+'" aria-label="Remove this change">✕</button></div>';
+    }).join('') : '<p class="small muted">No changes: the context stays at the baseline.</p>';
+  }
+  var c=$('b-cursor'); c.max=BUILD.T-1; if (BUILD.cursor!=null&&BUILD.cursor>BUILD.T-1) BUILD.cursor=BUILD.T-1;
+  runStory(); drawBuild();
+}
+function drawBuild(){
+  var runs=BUILD.runs, T=BUILD.T, cur=BUILD.cursor, p=S.p; if (!runs) return;
+  $('b-cursor').value=cur==null?T-1:cur; $('b-cursorOut').textContent=cur==null?'all '+T:cur+' / '+(T-1);
+  fillRange($('b-cursor'));
+  var x0=150, x1=628, cw=(x1-x0)/T, X=function(t){ return x0+(t+0.5)*cw; };
+  // --- state strip
+  var sv=$('b-strip'); clear(sv); var used={};
+  MODES.forEach(function(m,j){
+    var y=10+j*30;
+    el('text',{x:x0-8,y:y+16,'font-size':11.5,'text-anchor':'end',fill:m[0]===S.mode?'var(--ink)':'var(--muted)','font-weight':m[0]===S.mode?600:400},sv,m[1]);
+    runs[m[0]].forEach(function(r,t){
+      var vis=cur==null||t<=cur; used[r.next]=1;
+      el('rect',{x:x0+t*cw+0.5,y:y,width:Math.max(1,cw-1),height:22,fill:SCOL[r.next],opacity:vis?1:0.12,rx:2},sv);
+      if (r.violation&&vis) el('text',{x:x0+t*cw+cw/2,y:y+15,'font-size':Math.min(12,cw*0.8),'text-anchor':'middle',fill:'var(--warn)','font-weight':700},sv,'✕');
+    });
+  });
+  for (var t=0;t<T;t+=Math.max(1,Math.ceil(T/12))) el('text',{x:X(t),y:140,'font-size':10.5,'text-anchor':'middle',class:'mt',fill:'var(--muted)'},sv,String(t));
+  if (cur!=null) el('rect',{x:x0+cur*cw-1,y:4,width:cw+2,height:126,fill:'none',stroke:'var(--ink)','stroke-width':1.5,rx:3},sv);
+  $('b-legend').innerHTML=M.STATES.filter(function(s){return used[s];}).map(function(s){ return '<span><span class="sw" style="background:'+SCOL[s]+'"></span>'+TXT[s]+' '+M.STATE_LABEL[s]+'</span>'; }).join('')+'<span><b style="color:var(--warn)">✕</b> state forbidden by the constraints</span>';
+  // --- delta chart
+  var g=$('b-delta'); clear(g); var rows=runs[S.mode];
+  var ds=rows.map(function(r){return r.delta;}), lo=Math.min(-0.3,Math.min.apply(null,ds)-0.05), hi=Math.max(0.3,Math.max.apply(null,ds)+0.05);
+  var Y=function(v){ return 12+(hi-v)/(hi-lo)*176; }, xa=50;
+  var XD=function(t){ return xa+(t+0.5)*(x1-xa)/T; };
+  [[p.thetaM,hi,'var(--st-M)'],[-p.eps,p.eps,'var(--st-HM)'],[lo,-p.thetaH,'var(--st-H)']].forEach(function(b){ el('rect',{x:xa,y:Y(b[1]),width:x1-xa,height:Math.max(0,Y(b[0])-Y(b[1])),fill:b[2],opacity:.14},g); });
+  [lo,0,hi].concat([p.thetaM,-p.thetaH]).forEach(function(v,i){ el('line',{x1:xa,x2:x1,y1:Y(v),y2:Y(v),stroke:i===1?'var(--line-strong)':'var(--line)','stroke-width':1},g); });
+  [[hi,fmt(hi,2)],[0,'0'],[lo,fmt(lo,2)],[p.thetaM,'θM'],[-p.thetaH,'−θH']].forEach(function(a){ el('text',{x:xa-6,y:Y(a[0])+4,'font-size':10.5,'text-anchor':'end',class:'mt',fill:'var(--muted)'},g,a[1]); });
+  var d='', d2='', d3='';
+  rows.forEach(function(r,t){ d+=(t?'L':'M')+XD(t).toFixed(1)+' '+Y(r.delta).toFixed(1)+' '; });
+  el('path',{d:d,fill:'none',stroke:'var(--ink)','stroke-width':2.2},g);
+  rows.forEach(function(r,t){ if (cur==null||t<=cur) el('circle',{cx:XD(t),cy:Y(r.delta),r:2.6,fill:'var(--ink)'},g); });
+  for (var t2=0;t2<T;t2+=Math.max(1,Math.ceil(T/12))) el('text',{x:XD(t2),y:212,'font-size':10.5,'text-anchor':'middle',class:'mt',fill:'var(--muted)'},g,String(t2));
+  if (cur!=null) el('line',{x1:XD(cur),x2:XD(cur),y1:10,y2:190,stroke:'var(--ink)','stroke-width':1,'stroke-dasharray':'3 3'},g);
+  // --- inputs chart
+  var gi=$('b-inputs'); clear(gi);
+  var keys=[]; BUILD.events.forEach(function(e){ if (keys.indexOf(e.key)<0) keys.push(e.key); });
+  var pal=['var(--accent)','var(--warn)','var(--st-M)','var(--st-N)','var(--st-H)','var(--st-HM)','var(--ink)'];
+  var YI=function(v){ return 12+(1-v)*160; };
+  [0,.25,.5,.75,1].forEach(function(v){ el('line',{x1:xa,x2:x1,y1:YI(v),y2:YI(v),stroke:'var(--line)','stroke-width':1},gi); el('text',{x:xa-6,y:YI(v)+4,'font-size':10.5,'text-anchor':'end',class:'mt',fill:'var(--muted)'},gi,v.toFixed(2)); });
+  var refs={TC:p.kappa,ER:p.rho,VA_HM:p.tau};
+  keys.forEach(function(k,i){
+    var col=pal[i%pal.length], s=BUILD.si.ser[k], dd='';
+    if (refs[k]!=null) el('line',{x1:xa,x2:x1,y1:YI(refs[k]),y2:YI(refs[k]),stroke:col,'stroke-width':1,'stroke-dasharray':'4 3',opacity:.8},gi);
+    s.forEach(function(v,t){ dd+=(t?'L':'M')+XD(t).toFixed(1)+' '+YI(v).toFixed(1)+' '; });
+    el('path',{d:dd,fill:'none',stroke:col,'stroke-width':2.2},gi);
+  });
+  if (!keys.length) el('text',{x:(xa+x1)/2,y:95,'font-size':12,'text-anchor':'middle',fill:'var(--muted)'},gi,'No scripted changes');
+  for (var t3=0;t3<T;t3+=Math.max(1,Math.ceil(T/12))) el('text',{x:XD(t3),y:194,'font-size':10.5,'text-anchor':'middle',class:'mt',fill:'var(--muted)'},gi,String(t3));
+  if (cur!=null) el('line',{x1:XD(cur),x2:XD(cur),y1:10,y2:174,stroke:'var(--ink)','stroke-width':1,'stroke-dasharray':'3 3'},gi);
+  $('b-inLegend').innerHTML=keys.map(function(k,i){ return '<span><span class="sw" style="background:'+pal[i%pal.length]+'"></span>'+k+(refs[k]!=null?' (dashed: '+({TC:'κ',ER:'ρ',VA_HM:'τ'})[k]+')':'')+'</span>'; }).join('');
+  // --- KPIs
+  var upto=cur==null?T-1:cur;
+  $('b-kpis').innerHTML=MODES.map(function(m){
+    var rs=runs[m[0]].slice(0,upto+1), tr=0, vi=0, prev=BUILD.q0;
+    rs.forEach(function(r){ if (M.HOLDER[prev]!==M.HOLDER[r.next]) tr++; if (r.violation) vi++; prev=r.next; });
+    return '<div class="kpi"><h3>'+m[1]+'</h3><span class="v">'+SHORT[rs[rs.length-1].next]+'</span><span class="small muted">'+tr+' change'+(tr===1?'':'s')+' of authority · <span style="color:'+(vi?'var(--warn)':'inherit')+'">'+vi+' forbidden</span></span></div>';
+  }).join('');
+  // --- table
+  var hdr='<thead><tr><th class="n">t</th><th>Changes</th><th class="n">Δ</th>'+MODES.map(function(m){ return '<th>'+m[1]+'</th>'; }).join('')+'<th>Reason ('+MODES.filter(function(m){return m[0]===S.mode;})[0][1]+')</th></tr></thead>';
+  var body=rows.map(function(r,t){
+    var ch=[]; ALL_KEYS.forEach(function(k){ var s=BUILD.si.ser[k]; if (t>0&&Math.abs(s[t]-s[t-1])>1e-9) ch.push(k+' '+(k==='FC'||k==='HO'?s[t]:s[t].toFixed(2))); });
+    return '<tr'+(cur===t?' class="cur"':'')+'><td class="n">'+t+'</td><td class="mono small">'+(ch.join(', ')||'—')+'</td><td class="n">'+fmt(r.delta)+'</td>'+
+      MODES.map(function(m){ var q=runs[m[0]][t]; return '<td><span class="sw" style="background:'+SCOL[q.next]+'"></span>'+TXT[q.next]+(q.violation?' <b style="color:var(--warn)" title="forbidden by the constraints">✕</b>':'')+'</td>'; }).join('')+
+      '<td class="small">'+ruleReason(S.mode,r)+'</td></tr>';
+  }).join('');
+  $('b-table').innerHTML=hdr+'<tbody>'+body+'</tbody>';
+}
+
+/* =====================================================================
+   Rule comparison lab
+   ===================================================================== */
+var CMP={res:null,running:false,samples:null};
+function mulberry32(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; var t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+(function buildCmp(){
+  var s=$('c-q'); var o=document.createElement('option'); o.value='random'; o.textContent='Random (each state equally likely)'; s.appendChild(o); fillStateSelect(s); s.value='random';
+  $('c-run').addEventListener('click',runCmp);
+  $('c-samples').addEventListener('click',function(){
+    if (!CMP.samples){ toast('Run the comparison first'); return; }
+    var rows=[['i','q'].concat(ALL_KEYS).concat(MODES.map(function(m){return m[1];})).concat(MODES.map(function(m){return m[1]+' forbidden';}))];
+    CMP.samples.forEach(function(sm,i){ rows.push([i+1,TXT[sm.q]].concat(ALL_KEYS.map(function(k){ return k==='FC'||k==='HO'?sm.x[k]:sm.x[k].toFixed(4); })).concat(sm.next.map(function(n){return TXT[n];})).concat(sm.viol.map(function(v){return v?1:0;}))); });
+    saveFile('mcsm-rule-comparison-samples.csv',toCSV(rows),'text/csv');
+  });
+})();
+function runCmp(){
+  if (CMP.running) return;
+  var N=+$('c-n').value, qSel=$('c-q').value, pHO=M.clip01(+$('c-ho').value||0), pFC=M.clip01(+$('c-fc').value||0), seed=Math.round(+$('c-seed').value||0);
+  var rnd=mulberry32(seed), p=M.clone(S.p), i=0, chunk=2500, keep=N<=50000;
+  var R={N:N,seed:seed,q:qSel,pHO:pHO,pFC:pFC,next:{},viol:{},byC:{},stable:{},dis:{},pairs:{},n:0};
+  MODES.forEach(function(m){ R.next[m[0]]={}; R.viol[m[0]]=0; R.byC[m[0]]={'(4)':0,'(5)':0,'(6)':0,'(7)':0}; R.stable[m[0]]={cycle:0,none:0}; });
+  var samples=keep?[]:null;
+  CMP.running=true; $('c-run').disabled=true;
+  (function work(){
+    var end=Math.min(N,i+chunk);
+    for (;i<end;i++){
+      var x={}; for (var k=0;k<11;k++) x[ALL_KEYS[k]]=rnd(); x.FC=rnd()<pFC?1:0; x.HO=rnd()<pHO?1:0;
+      var q=qSel==='random'?M.STATES[Math.floor(rnd()*6)]:qSel, sc=M.scores(x,p), nx=[], vi=[];
+      MODES.forEach(function(m){
+        var r=M.decide(q,sc.delta,x,p,m[0]);
+        R.next[m[0]][r.next]=(R.next[m[0]][r.next]||0)+1;
+        var forb=r.violation; // for enforced, violation describes the published choice before replacement
+        if (forb){ R.viol[m[0]]++; var why=(r.A.excluded[m[0]==='enforced'?M.decide(q,sc.delta,x,p,'literal').next:r.next]||[]);
+          var seen={}; why.forEach(function(w){ var c=w.slice(0,3); if(!seen[c]){ seen[c]=1; R.byC[m[0]][c]=(R.byC[m[0]][c]||0)+1; } }); }
+        nx.push(r.next); vi.push(forb);
+        var ro=M.rollout(q,x,p,m[0],20); var key=ro.stable?ro.final:(ro.cycle?'cycle':'none');
+        R.stable[m[0]][key]=(R.stable[m[0]][key]||0)+1;
+      });
+      for (var a=0;a<4;a++) for (var b=a+1;b<4;b++) if (nx[a]!==nx[b]){ var kk=a+'-'+b; R.dis[kk]=(R.dis[kk]||0)+1; }
+      if (nx[0]!==nx[3]){ var pk=TXT[q]+'|'+TXT[nx[0]]+'|'+TXT[nx[3]]; R.pairs[pk]=(R.pairs[pk]||0)+1; }
+      if (samples) samples.push({q:q,x:x,next:nx,viol:vi});
+    }
+    R.n=i; $('c-status').textContent='Running… '+Math.round(100*i/N)+' %';
+    if (i<N) setTimeout(work,0);
+    else { CMP.running=false; $('c-run').disabled=false; CMP.res=R; CMP.samples=samples; $('c-samples').disabled=!samples;
+      $('c-status').textContent=N.toLocaleString('en')+' contexts · seed '+seed+' · '+(qSel==='random'?'random current state':'from '+TXT[qSel]); renderCmp(); }
+  })();
+}
+function pct(a,n,d){ return (100*a/n).toFixed(d==null?1:d)+' %'; }
+function renderCmp(){
+  var R=CMP.res;
+  if (!R){ $('c-kpis').innerHTML='<p class="small muted">Press Run to compare the four rules.</p>'; return; }
+  var N=R.N;
+  $('c-kpis').innerHTML=MODES.map(function(m){ var v=R.viol[m[0]];
+    return '<div class="kpi"><h3>'+m[1]+'</h3><span class="v" style="color:'+(v?'var(--warn)':'var(--ok)')+'">'+pct(v,N)+'</span><span class="small muted">'+(m[0]==='enforced'?'forbidden before fallback, 0 % after':'of contexts give a forbidden state')+'</span></div>'; }).join('');
+  // distribution chart
+  var g=$('c-dist'); clear(g); var x0=170, x1=590, W=x1-x0;
+  MODES.forEach(function(m,j){
+    var y=14+j*46, acc=0;
+    el('text',{x:x0-8,y:y+18,'font-size':12,'text-anchor':'end',fill:'var(--ink)'},g,m[1]);
+    M.STATES.forEach(function(s){ var n=R.next[m[0]][s]||0; if(!n) return; var w=W*n/N;
+      el('rect',{x:x0+acc,y:y,width:w,height:28,fill:SCOL[s]},g);
+      if (w>34) el('text',{x:x0+acc+w/2,y:y+18,'font-size':10.5,'text-anchor':'middle',class:'mt',fill:'var(--panel)'},g,Math.round(100*n/N)+'%');
+      acc+=w; });
+  });
+  [0,.5,1].forEach(function(v){ el('text',{x:x0+v*W,y:206,'font-size':10.5,'text-anchor':'middle',class:'mt',fill:'var(--muted)'},g,(v*100)+'%'); });
+  $('c-distLegend').innerHTML=M.STATES.map(function(s){ return '<span><span class="sw" style="background:'+SCOL[s]+'"></span>'+TXT[s]+'</span>'; }).join('');
+  // violations by constraint
+  var gv=$('c-viol'); clear(gv); var cons=['(4)','(5)','(6)','(7)'], cn={'(4)':'(4) HO','(5)':'(5) ER/FC','(6)':'(6) VA_HM','(7)':'(7) TC'};
+  var mx=0; MODES.forEach(function(m){ cons.forEach(function(c){ mx=Math.max(mx,R.byC[m[0]][c]/N); }); }); mx=Math.max(mx,0.01);
+  var gx0=170, gW=400, colC=['var(--st-H)','var(--warn)','var(--st-HM)','var(--st-M)'];
+  MODES.forEach(function(m,j){
+    var y=14+j*46; el('text',{x:gx0-8,y:y+18,'font-size':12,'text-anchor':'end',fill:'var(--ink)'},gv,m[1]);
+    cons.forEach(function(c,ci){ var v=R.byC[m[0]][c]/N, w=gW*v/mx;
+      el('rect',{x:gx0,y:y+ci*7,width:Math.max(v>0?1:0,w),height:6,fill:colC[ci]},gv);
+      if (v>0) el('text',{x:gx0+w+4,y:y+ci*7+6,'font-size':9,class:'mt',fill:'var(--muted)'},gv,(100*v).toFixed(1)+'%'); });
+  });
+  cons.forEach(function(c,ci){ el('rect',{x:gx0+ci*100,y:198,width:10,height:10,fill:colC[ci]},gv); el('text',{x:gx0+ci*100+14,y:207,'font-size':10.5,fill:'var(--muted)'},gv,cn[c]); });
+  // disagreement
+  $('c-dis').innerHTML='<thead><tr><th></th>'+MODES.map(function(m){return '<th class="n">'+m[1]+'</th>';}).join('')+'</tr></thead><tbody>'+
+    MODES.map(function(m,a){ return '<tr><th>'+m[1]+'</th>'+MODES.map(function(n,b){ if (a===b) return '<td class="n muted">—</td>'; var k=Math.min(a,b)+'-'+Math.max(a,b); return '<td class="n">'+pct(R.dis[k]||0,N)+'</td>'; }).join('')+'</tr>'; }).join('')+'</tbody>';
+  // stable
+  var cats=M.STATES.concat(['cycle','none']), lab={cycle:'cycle',none:'not settled'};
+  $('c-stable').innerHTML='<thead><tr><th>Settles in</th>'+MODES.map(function(m){return '<th class="n">'+m[1]+'</th>';}).join('')+'</tr></thead><tbody>'+
+    cats.filter(function(c){ return MODES.some(function(m){ return R.stable[m[0]][c]; }); }).map(function(c){
+      return '<tr><td>'+(lab[c]||('<span class="sw" style="background:'+SCOL[c]+'"></span>'+TXT[c]))+'</td>'+MODES.map(function(m){ return '<td class="n">'+pct(R.stable[m[0]][c]||0,N)+'</td>'; }).join('')+'</tr>'; }).join('')+'</tbody>';
+  // pairs
+  var pairs=Object.keys(R.pairs).map(function(k){ return [k,R.pairs[k]]; }).sort(function(a,b){ return b[1]-a[1]; }).slice(0,12);
+  $('c-pairs').innerHTML='<thead><tr><th>From q<sub>t</sub></th><th>Published rule</th><th>Admissibility-preserving rule</th><th class="n">Contexts</th><th class="n">Share</th></tr></thead><tbody>'+
+    (pairs.length?pairs.map(function(pr){ var z=pr[0].split('|'); return '<tr><td>'+z[0]+'</td><td>'+z[1]+'</td><td>'+z[2]+'</td><td class="n">'+pr[1].toLocaleString('en')+'</td><td class="n">'+pct(pr[1],N)+'</td></tr>'; }).join(''):'<tr><td colspan="5">The two rules agree on every sampled context.</td></tr>')+'</tbody>';
+}
+
+/* =====================================================================
+   Scenario replay: import / export
+   ===================================================================== */
+var SCEN_ACTIVE=SCENARIOS, SCEN_CUSTOM=false;
+var PCOLS=[]; ['H','M','G'].forEach(function(i){ ['chi','a','k','f','d'].forEach(function(f){ PCOLS.push([f+'_'+i,i,f]); }); });
+function scenToCSV(){
+  var res=SCEN_ACTIVE.map(replayOne);
+  var rows=[['id','family','title'].concat(ALL_KEYS).concat(['y']).concat(PCOLS.map(function(c){return c[0];})).concat(['one_step','stable','R_H','R_M','R_G','notebook_stable'])];
+  SCEN_ACTIVE.forEach(function(sc,i){ var r=res[i];
+    rows.push([sc.id,sc.f,sc.t].concat(ALL_KEYS.map(function(k){return sc.x[k];})).concat([sc.y!=null?sc.y:'']).concat(PCOLS.map(function(c){ return sc.P?sc.P[c[1]][c[2]]:''; }))
+      .concat([TXT[r.one.next],TXT[r.stable],r.resp.ok?r.resp.rows.H.R.toFixed(4):'',r.resp.ok?r.resp.rows.M.R.toFixed(4):'',r.resp.ok?r.resp.rows.G.R.toFixed(4):'',sc.os?TXT[sc.os]:'']));
+  });
+  return toCSV(rows);
+}
+function scenFromCSV(txt){
+  var rows=parseCSV(txt); if (rows.length<2) throw new Error('the file has no data rows');
+  var h=rows.shift().map(function(s){ return s.trim(); }), ix=function(n){ return h.indexOf(n); };
+  var miss=ALL_KEYS.filter(function(k){ return ix(k)<0; }); if (miss.length) throw new Error('missing columns '+miss.join(', '));
+  return rows.map(function(r,n){
+    var x={}; ALL_KEYS.forEach(function(k){ var v=parseFloat(r[ix(k)]); if (isNaN(v)) throw new Error('row '+(n+2)+': '+k+' is not a number'); x[k]=(k==='FC'||k==='HO')?(v>=.5?1:0):M.clip01(v); });
+    var hasP=PCOLS.every(function(c){ return ix(c[0])>=0 && r[ix(c[0])]!==''&&!isNaN(parseFloat(r[ix(c[0])])); }), P=null;
+    if (hasP){ P={H:{},M:{},G:{}}; PCOLS.forEach(function(c){ P[c[1]][c[2]]=M.clip01(parseFloat(r[ix(c[0])])); }); }
+    var y=ix('y')>=0&&r[ix('y')]!==''?M.clip01(parseFloat(r[ix('y')])):null;
+    return {id:ix('id')>=0&&r[ix('id')]!==''?r[ix('id')]:String(n+1), f:ix('family')>=0&&r[ix('family')]?r[ix('family')]:'—', t:ix('title')>=0?(r[ix('title')]||''):'', x:x, P:P, y:isNaN(y)?null:y};
+  });
+}
+function rebuildFamilies(){
+  var f=$('sc-fam'), keep=f.value; f.innerHTML='';
+  var o=document.createElement('option'); o.value=''; f.appendChild(o);
+  var fams=[]; SCEN_ACTIVE.forEach(function(s){ if (fams.indexOf(s.f)<0) fams.push(s.f); }); fams.sort();
+  o.textContent='All '+fams.length+' famil'+(fams.length===1?'y':'ies');
+  fams.forEach(function(k){ var o2=document.createElement('option'); o2.value=k; o2.textContent=k+(SCEN_FAMILIES[k]&&!SCEN_CUSTOM?' — '+SCEN_FAMILIES[k]:''); f.appendChild(o2); });
+  f.value=fams.indexOf(keep)>=0?keep:'';
+}
+(function buildScenIO(){
+  $('sc-export').addEventListener('click',function(){ saveFile(SCEN_CUSTOM?'mcsm-scenarios-custom.csv':'mcsm-scenarios-100.csv',scenToCSV(),'text/csv'); });
+  $('sc-import').addEventListener('change',function(){ readFile(this,function(txt,name){
+    try{ var set=scenFromCSV(txt); SCEN_ACTIVE=set; SCEN_CUSTOM=true; $('sc-reset').hidden=false;
+      $('sc-setNote').textContent='Showing '+set.length+' imported scenario'+(set.length===1?'':'s')+' from '+name+'. Rows without χ, a, k, f, d use the regime presets from the Responsibility tab; rows without y use y on that tab.';
+      rebuildFamilies(); render(); toast('Imported '+set.length+' scenarios'); }
+    catch(err){ $('sc-setNote').textContent='Could not import: '+err.message; }
+  }); });
+  $('sc-reset').addEventListener('click',function(){ SCEN_ACTIVE=SCENARIOS; SCEN_CUSTOM=false; this.hidden=true; $('sc-setNote').textContent='The CSV uses the same columns for export and import, so you can download the set, edit or add rows, and load it back.'; rebuildFamilies(); render(); });
+})();
+
+/* =====================================================================
+   Share settings
+   ===================================================================== */
+var PAGES_URL='https://eskondoript-ship-it.github.io/M-CSM/';
+function b64e(s){ return btoa(unescape(encodeURIComponent(s))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); }
+function b64d(s){ s=s.replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4) s+='='; return decodeURIComponent(escape(atob(s))); }
+function settingsObj(){
+  return {v:1, tab:S.tab, mode:S.mode, x:S.x, q:S.q, p:S.p, presets:S.presets, respState:S.respState, respFollow:S.respFollow, y:S.y, p3:S.p3,
+    land:{xKey:LAND.xKey,yKey:LAND.yKey}, story:{T:BUILD.T,q0:BUILD.q0,base:BUILD.base,events:BUILD.events,preset:BUILD.preset},
+    cmp:{n:$('c-n').value,q:$('c-q').value,ho:$('c-ho').value,fc:$('c-fc').value,seed:$('c-seed').value}};
+}
+function applySettings(o){
+  if (!o||typeof o!=='object') throw new Error('not a settings file');
+  if (o.mode&&['literal','enforced','eq8','revised'].indexOf(o.mode)>=0) S.mode=o.mode;
+  if (o.x) ALL_KEYS.forEach(function(k){ if (typeof o.x[k]==='number') S.x[k]=(k==='FC'||k==='HO')?(o.x[k]>=.5?1:0):M.clip01(o.x[k]); });
+  if (o.q&&M.STATES.indexOf(o.q)>=0) S.q=o.q;
+  if (o.p) Object.keys(M.DEFAULT_PARAMS).forEach(function(k){ if (o.p[k]!=null) S.p[k]=o.p[k]; });
+  if (o.presets) M.STATES.forEach(function(s){ if (o.presets[s]) S.presets[s]=o.presets[s]; });
+  if (o.respState&&M.STATES.indexOf(o.respState)>=0) S.respState=o.respState;
+  if (typeof o.respFollow==='boolean') S.respFollow=o.respFollow;
+  if (typeof o.y==='number') S.y=M.clip01(o.y);
+  if (o.p3) Object.keys(S.p3).forEach(function(k){ if (o.p3[k]!=null) S.p3[k]=o.p3[k]; });
+  if (o.land){ if (LAND_KEYS.indexOf(o.land.xKey)>=0) LAND.xKey=o.land.xKey; if (LAND_KEYS.indexOf(o.land.yKey)>=0) LAND.yKey=o.land.yKey; }
+  if (o.story){ BUILD.T=o.story.T||BUILD.T; BUILD.q0=o.story.q0||BUILD.q0; if (o.story.base) BUILD.base=o.story.base; if (o.story.events) BUILD.events=o.story.events; BUILD.preset=o.story.preset||'custom'; }
+  if (o.cmp){ ['n','q','ho','fc','seed'].forEach(function(k){ if (o.cmp[k]!=null) $('c-'+k).value=o.cmp[k]; }); }
+  Array.prototype.forEach.call($('modeSeg').querySelectorAll('button'),function(b){ b.setAttribute('aria-pressed',b.getAttribute('data-mode')===S.mode?'true':'false'); });
+  return o.tab&&TABS.indexOf(o.tab)>=0?o.tab:null;
+}
+(function buildShare(){
+  var pop=$('sharePop'), btn=$('shareBtn');
+  function link(){ return PAGES_URL+'#s='+b64e(JSON.stringify(settingsObj())); }
+  btn.addEventListener('click',function(e){ e.stopPropagation(); var open=pop.hidden; pop.hidden=!open; btn.setAttribute('aria-expanded',open?'true':'false'); if (open){ $('shareLink').value=link(); $('shareMsg').textContent=''; } });
+  document.addEventListener('click',function(e){ if (!pop.hidden&&!pop.contains(e.target)&&e.target!==btn){ pop.hidden=true; btn.setAttribute('aria-expanded','false'); } });
+  document.addEventListener('keydown',function(e){ if (e.key==='Escape'&&!pop.hidden){ pop.hidden=true; btn.setAttribute('aria-expanded','false'); btn.focus(); } });
+  $('shareLink').addEventListener('focus',function(){ this.select(); });
+  $('shareCopy').addEventListener('click',function(){
+    var v=$('shareLink').value=link(), done=function(){ $('shareMsg').textContent='Link copied.'; }, manual=function(){ var i=$('shareLink'); i.focus(); i.select(); var ok=false; try{ ok=document.execCommand('copy'); }catch(e){} $('shareMsg').textContent=ok?'Link copied.':'Select the link above and copy it.'; };
+    if (navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(v).then(done,manual); else manual();
+  });
+  $('shareSave').addEventListener('click',function(){ saveFile('mcsm-settings.json',JSON.stringify(settingsObj(),null,2),'application/json'); });
+  $('shareLoad').addEventListener('change',function(){ readFile(this,function(txt){
+    try{ var t=applySettings(JSON.parse(txt)); $('shareMsg').textContent='Settings loaded.'; renderBuild(); showTab(t||S.tab); }
+    catch(err){ $('shareMsg').textContent='Could not load: '+err.message; }
+  }); });
+})();
+function settingsFromHash(){
+  var m=(location.hash||'').match(/[#&]s=([A-Za-z0-9_-]+)/); if (!m) return null;
+  try{ return applySettings(JSON.parse(b64d(m[1]))); }catch(e){ return null; }
+}
+
 function render(fromParamInput){
   syncers.forEach(function(s){ s.sync(); });
   $('in-FC').checked=S.x.FC===1; $('in-HO').checked=S.x.HO===1;
   $('qSel').value=S.q;
   var ei=matchExample(); $('exampleSel').value = ei>=0 ? String(ei) : 'custom';
-  var lsc = S.loaded ? SCENARIOS[S.loaded-1] : null; var lmatch = lsc && Object.keys(lsc.x).every(function(k){ return Math.abs(lsc.x[k]-S.x[k])<1e-9; });
+  var lsc = S.loaded || null; var lmatch = lsc && Object.keys(lsc.x).every(function(k){ return Math.abs(lsc.x[k]-S.x[k])<1e-9; });
   if (!lmatch) S.loaded = null;
   $('exampleNote').textContent = ei>=0 ? EXAMPLES[ei].note : (lmatch ? 'Scenario '+lsc.id+' ('+lsc.f+'): '+lsc.t+'. Its responsibility inputs are loaded on the Responsibility tab.' : 'Inputs edited by hand.');
   if ($('modeNote').textContent!==MODE_NOTE[S.mode]){ $('modeNote').textContent=MODE_NOTE[S.mode]; restart($('modeNote'),'note-in'); }
@@ -1559,11 +2209,15 @@ function render(fromParamInput){
   if (S.tab==='scen') renderScen();
   if (S.tab==='land') renderLand();
   if (S.tab==='par') renderPar(fromParamInput===true);
+  if (S.tab==='build') renderBuild();
+  if (S.tab==='cmp') renderCmp();
   fillAllRanges();
 }
 var startTab='epoch';
 try{ var st=localStorage.getItem('mcsm-tab'); if (st && TABS.indexOf(st)>=0) startTab=st; }catch(e){}
 var hash=(location.hash||'').replace('#',''); if (TABS.indexOf(hash)>=0) startTab=hash;
+var hashTab=settingsFromHash(); if (hashTab) startTab=hashTab;
+addExportBars();
 showTab(startTab);
 sizeModeNote();
 })();
