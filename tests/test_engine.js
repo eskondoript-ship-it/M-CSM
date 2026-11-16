@@ -47,4 +47,40 @@ ok('stable-state counts are 26 / 45 / 28 / 1');
 assert.deepStrictEqual(count(replay('revised')), count(pub));
 ok('admissibility-preserving rule gives the same 26 / 45 / 28 / 1');
 
+// 5. Monte Carlo comparison is reproducible and matches the figures quoted in the simulator notes
+const mc = M.compareRules({ N: 200000, seed: 2026, q: 'random', pHO: 0.1, pFC: 0.1, p });
+const pc = v => (100 * v / mc.N).toFixed(1);
+assert.strictEqual(pc(mc.viol.literal), '8.0'); assert.strictEqual(pc(mc.viol.eq8), '3.0');
+assert.strictEqual(mc.viol.revised, 0); assert.strictEqual(pc(mc.dis['0-2']), '25.1');
+assert.strictEqual(mc.viol.enforced, mc.viol.literal);
+const mc2 = M.compareRules({ N: 5000, seed: 11, q: 'S_H', pHO: 0.1, pFC: 0.1, p });
+const mc3 = M.compareRules({ N: 5000, seed: 11, q: 'S_H', pHO: 0.1, pFC: 0.1, p });
+assert.deepStrictEqual(mc2.next, mc3.next); assert.deepStrictEqual(mc2.dis, mc3.dis);
+ok('Monte Carlo: 8.0 % / 3.0 % forbidden, 25.1 % disagreement (200,000 contexts, seed 2026), same seed gives same result');
+
+// 6. Scripted story: steps and linear ramps
+const st = M.storyInputs(x, [{ t: 6, key: 'CP_M', v: 0.4, r: 0 }, { t: 8, key: 'TR_M', v: 0.5, r: 4 }, { t: 3, key: 'HO', v: 1, r: 9 }], 12);
+assert.strictEqual(st.ser.CP_M[5], 0.95); assert.strictEqual(st.ser.CP_M[6], 0.4);
+assert(Math.abs(st.ser.TR_M[8] - 0.8) < 1e-12 && Math.abs(st.ser.TR_M[11] - 0.5) < 1e-12);
+assert.strictEqual(st.ser.HO[2], 0); assert.strictEqual(st.ser.HO[3], 1);
+const run = M.runStory(x, [{ t: 6, key: 'CP_M', v: 0.4, r: 0 }], 12, 'S_H', p, 'literal').rows.map(r => r.next);
+assert.deepStrictEqual(run.slice(0, 8), ['S_HtoM', 'S_M', 'S_M', 'S_M', 'S_M', 'S_M', 'S_MtoH', 'S_H']);
+ok('scripted stories: step and ramp changes, handover then return');
+
+// 7. Tipping points: crossing the reported value really changes the result
+const tp = M.tippingPoints('S_H', x, p, 'literal');
+for (const r of tp.rows) for (const d of [r.down, r.up]) {
+  if (!d) continue;
+  const at = v => { const c = M.clone(x); c[r.key] = v; const s = M.step('S_H', c, p, 'literal'); return s.next + (s.violation ? '!' : ''); };
+  const before = at(d.at - Math.sign(d.change) * 1e-3), after = at(d.at);
+  assert.notStrictEqual(before, after); assert.strictEqual(before, 'S_HtoM');
+}
+assert(Math.abs(tp.rows.find(r => r.key === 'ER').up.at - 0.7) < 1e-4);
+assert(tp.rows.find(r => r.key === 'TC').up.forbidden);
+ok('tipping points mark where the result changes (ER at ρ, TC at κ becomes forbidden)');
+
+// 8. Scenario counts helper agrees with the replay
+assert.deepStrictEqual(M.scenarioCounts(scenarios, p, 'literal'), { S_H: 26, S_HtoM: 0, S_M: 1, S_MtoH: 0, S_HM: 45, S_N: 28 });
+ok('scenario counts helper gives 26 / 45 / 28 / 1');
+
 console.log(`\n${pass} checks passed.`);

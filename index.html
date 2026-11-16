@@ -20,12 +20,12 @@
 @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
   --bg:#151a1e; --panel:#1c2227; --ink:#e4e8e6; --muted:#9aa6ad; --line:#2f383e; --line-strong:#4a555c;
   --accent:#6fb7c2; --accent-soft:#1f3539; --warn:#ef9a6c; --warn-soft:#3a2519; --ok:#7fc99a;
-  --st-H:#e0a057; --st-Hs:#5a4223; --st-M:#78a6d6; --st-Ms:#2a3e55; --st-HM:#5cc0a8; --st-N:#a99cc4; --st-Ns:#3a3449;
+  --st-H:#e0a057; --st-Hs:#8d6a3c; --st-M:#78a6d6; --st-Ms:#4b6c93; --st-HM:#5cc0a8; --st-N:#a99cc4; --st-Ns:#3a3449;
   color-scheme:dark }}
 :root[data-theme="dark"]{
   --bg:#151a1e; --panel:#1c2227; --ink:#e4e8e6; --muted:#9aa6ad; --line:#2f383e; --line-strong:#4a555c;
   --accent:#6fb7c2; --accent-soft:#1f3539; --warn:#ef9a6c; --warn-soft:#3a2519; --ok:#7fc99a;
-  --st-H:#e0a057; --st-Hs:#5a4223; --st-M:#78a6d6; --st-Ms:#2a3e55; --st-HM:#5cc0a8; --st-N:#a99cc4; --st-Ns:#3a3449;
+  --st-H:#e0a057; --st-Hs:#8d6a3c; --st-M:#78a6d6; --st-Ms:#4b6c93; --st-HM:#5cc0a8; --st-N:#a99cc4; --st-Ns:#3a3449;
   color-scheme:dark }
 *{box-sizing:border-box}
 [hidden]{display:none!important}
@@ -138,9 +138,9 @@ body{background:radial-gradient(1200px 700px at 20% -10%,var(--panel),transparen
 .chip,.kpi,.readout{border-radius:8px;background:var(--panel);box-shadow:inset 0 1px 0 var(--sh-hi),0 2px 0 var(--line),0 4px 10px -4px var(--sh-lo)}
 .readout{padding:8px 10px;border:1px solid var(--line)}
 .chip.out{box-shadow:inset 0 2px 4px var(--sh-lo2)}
-nav.tabs{position:sticky;top:0;z-index:30;gap:5px;padding:8px 2px 10px;border-bottom:0;
+nav.tabs{position:sticky;top:0;z-index:30;gap:3px;padding:8px 2px 10px;border-bottom:0;
   background:color-mix(in srgb,var(--bg) 88%,transparent);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
-nav.tabs button{padding:7px 12px;font-size:13.5px;border-radius:8px;border:1px solid var(--key-edge);border-bottom-width:1px;margin:0;color:var(--ink);
+nav.tabs button{padding:6px 6px;font-size:12.5px;border-radius:8px;border:1px solid var(--key-edge);border-bottom-width:1px;margin:0;color:var(--ink);
   background:linear-gradient(180deg,var(--panel),var(--key));box-shadow:inset 0 1px 0 var(--sh-hi),0 4px 0 var(--key-edge),0 6px 10px -2px var(--sh-lo);
   transform:translateY(0);transition:transform .08s,box-shadow .08s;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
 nav.tabs button:hover{background:linear-gradient(180deg,var(--panel),var(--accent-soft))}
@@ -230,6 +230,17 @@ nav.tabs button,.seg button,.btn{position:relative;overflow:hidden}
 .evrow input[type=number]{width:4.6em}
 tr.cur td{background:var(--accent-soft)}
 #sharePop{box-shadow:0 18px 40px -10px var(--sh-lo),0 4px 10px var(--sh-lo2)}
+
+/* ===== v2: phone result bar, chart minimum widths, heatmap ===== */
+#mini{display:none}
+@media (max-width:860px){
+  #mini:not([hidden]){display:flex;flex-wrap:wrap;gap:4px 12px;align-items:center;position:sticky;top:var(--navh,52px);z-index:29;margin:-8px -16px 0;padding:6px 16px;font-size:12.5px;
+    background:color-mix(in srgb,var(--panel) 92%,transparent);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+  #mini b{font-family:var(--mono);font-weight:500}
+}
+#b-strip,#b-delta,#b-inputs,#c-dist,#c-viol,#respAll,#sc-famChart,#tx-map{min-width:520px}
+#tx-map rect.cell{cursor:pointer}
+.stale{color:var(--warn)}
 @media (max-width:700px){
   nav.tabs{flex-wrap:nowrap;overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:x proximity;scrollbar-width:none;margin:0 -16px;padding:8px 16px 10px;
     -webkit-mask-image:linear-gradient(90deg,#000 85%,transparent);mask-image:linear-gradient(90deg,#000 85%,transparent)}
@@ -247,7 +258,8 @@ tr.cur td{background:var(--accent-soft)}
   <div>
     <h1>M-CSM Simulator</h1>
     <div class="row" style="margin-top:10px;position:relative">
-      <button class="btn" type="button" id="shareBtn" aria-expanded="false" aria-controls="sharePop">Share settings</button>
+      <button class="btn" type="button" id="shareBtn" aria-expanded="false" aria-controls="sharePop">Share, save &amp; report</button>
+      <button class="btn" type="button" id="glossBtn" aria-expanded="false" aria-controls="glossPop">Symbols</button>
       <div id="sharePop" class="panel" hidden style="position:absolute;top:calc(100% + 8px);left:0;z-index:60;width:min(440px,calc(100vw - 32px))">
         <h3>Share or save these settings</h3>
         <p class="small muted">The link opens the simulator on GitHub with every input, rule, threshold, responsibility value and story restored.</p>
@@ -257,7 +269,16 @@ tr.cur td{background:var(--accent-soft)}
           <button class="btn" type="button" id="shareSave">Download settings file</button>
           <label class="btn" for="shareLoad" style="display:inline-flex;align-items:center">Load settings file</label><input type="file" id="shareLoad" accept=".json,application/json" hidden>
         </div>
+        <div class="row">
+          <button class="btn" type="button" id="reportBtn">Download report</button>
+          <button class="btn" type="button" id="resetAll">Reset everything</button>
+        </div>
+        <p class="small muted">The report is a text file (Markdown) with the current settings, decision, tipping points, rollout, responsibility, scenario counts under each rule, the story and the last rule comparison. Your settings are remembered in this browser between visits.</p>
         <p class="small" id="shareMsg" aria-live="polite"></p>
+      </div>
+      <div id="glossPop" class="panel" hidden style="position:absolute;top:calc(100% + 8px);left:0;z-index:60;width:min(560px,calc(100vw - 32px));max-height:70vh;overflow:auto">
+        <h3>Symbols used in the simulator</h3>
+        <div class="tablebox"><table id="glossTable"></table></div>
       </div>
     </div>
   </div>
@@ -284,8 +305,9 @@ tr.cur td{background:var(--accent-soft)}
   <button role="tab" id="tab-build" aria-selected="false" aria-controls="pane-build">Scenario builder</button>
   <button role="tab" id="tab-cmp" aria-selected="false" aria-controls="pane-cmp">Rule comparison</button>
   <button role="tab" id="tab-p3" aria-selected="false" aria-controls="pane-p3">Responsibility drift</button>
-  <button role="tab" id="tab-par" aria-selected="false" aria-controls="pane-par">Parameters &amp; notes</button>
+  <button role="tab" id="tab-par" aria-selected="false" aria-controls="pane-par">Parameters</button>
 </nav>
+<div id="mini" hidden aria-live="polite"></div>
 
 <!-- ============ DECISION EPOCH ============ -->
 <section id="pane-epoch" role="tabpanel" aria-labelledby="tab-epoch">
@@ -340,8 +362,15 @@ tr.cur td{background:var(--accent-soft)}
     </div>
 
     <div class="panel">
-      <h3 id="algoTitle">Published rule — line that fired</h3>
+      <h3 id="algoTitle">Published rule — condition that applied</h3>
       <div class="algo" id="algo"></div>
+    </div>
+
+    <div class="panel">
+      <div class="row" style="justify-content:space-between"><h3>Tipping points</h3><span class="small muted">each input moved alone, all others held fixed</span></div>
+      <p id="tipSummary"></p>
+      <div class="tablebox"><table id="tipTable"></table></div>
+      <p class="small muted">The nearest value below and above the current one at which the result changes: a different next state, or the same state becoming forbidden (marked ✕) or allowed. “—” means no change anywhere in that direction.</p>
     </div>
 
     <div class="panel">
@@ -436,6 +465,12 @@ tr.cur td{background:var(--accent-soft)}
       <div class="tablebox"><table id="respTable"></table></div>
       <p class="small" id="respCheck"></p>
     </div>
+    <div class="panel">
+      <h3>Responsibility across the six regimes</h3>
+      <div class="svgbox"><svg id="respAll" viewBox="0 0 600 250" role="img" aria-label="Responsibility shares in each regime"></svg></div>
+      <div class="legend"><span><span class="sw" style="background:var(--st-H)"></span>Human</span><span><span class="sw" style="background:var(--st-M)"></span>Machine</span><span><span class="sw" style="background:var(--st-N)"></span>Supervisor</span><span>▸ regime shown above</span></div>
+      <p class="small muted">Total share R<sub>i</sub> for each regime, using that regime's factors and the current y<sub>t</sub>. It shows how answerability moves when authority moves.</p>
+    </div>
   </div>
 </div>
 </section>
@@ -451,6 +486,24 @@ tr.cur td{background:var(--accent-soft)}
     </div>
     <div class="kpis" id="sc-kpis"></div>
     <p class="small" id="sc-constraints"></p>
+  </div>
+  <div class="twocol">
+    <div class="panel">
+      <h3>Stable state by family</h3>
+      <div class="svgbox"><svg id="sc-famChart" viewBox="0 0 600 460" role="img" aria-label="Stable states per scenario family"></svg></div>
+      <div class="legend" id="sc-famLegend"></div>
+    </div>
+    <div class="panel">
+      <h3>Threshold explorer</h3>
+      <p class="small muted">How many scenarios settle in the chosen state as two thresholds vary, with everything else as set. The ring marks the current values; outlined cells reproduce the current counts exactly. Click a cell to read it, then apply it if you wish.</p>
+      <div class="row">
+        <label class="small" for="tx-x">Across</label><select id="tx-x"></select>
+        <label class="small" for="tx-y">Up</label><select id="tx-y"></select>
+        <label class="small" for="tx-s">Count of</label><select id="tx-s"></select>
+      </div>
+      <div class="svgbox"><svg id="tx-map" viewBox="0 0 600 400" role="img" aria-label="Scenario counts over two thresholds"></svg></div>
+      <div class="row"><span class="small" id="tx-read">Click a cell.</span><button class="btn" type="button" id="tx-apply" hidden>Apply these thresholds</button></div>
+    </div>
   </div>
   <div class="panel">
     <div class="row">
@@ -643,6 +696,7 @@ tr.cur td{background:var(--accent-soft)}
     <div class="group"><h3>Strength weights w<sup>M</sup> (CP, TR, VA, 1−UC)</h3><div class="pgrid" id="par-wM"></div></div>
     <p class="small" id="wNote"></p>
     <div class="group"><h3>Thresholds</h3><div class="pgrid" id="par-th"></div></div>
+    <p class="small" id="thNote"></p>
     <div class="group"><h3>Responsibility exponents</h3><div class="pgrid" id="par-ex"></div></div>
   </div>
   <div class="panel notes">
@@ -650,9 +704,9 @@ tr.cur td{background:var(--accent-soft)}
     <p><b>From the paper.</b> Context vector (1); strength score (2) as a weighted geometric mean with 0<sup>0</sup> = 1; Δ (3); admissibility constraints (4)–(7); the compact rule; the published transition rule line by line; responsibility (9)–(12) with the ψ fallback for a zero denominator; reference weights, thresholds and exponents.</p>
     <p><b>Policy modes.</b> The paper's compact rule and its published rule differ, and the published rule can return a state its own constraints exclude:</p>
     <ul>
-      <li>Line 6 returns S<sub>H→M</sub> without checking (7), so a time-critical case with a machine advantage enters an excluded handover state.</li>
-      <li>Line 16 returns S<sub>N</sub> without checking (7), so a time-critical, ambiguous case enters excluded negotiation.</li>
-      <li>Line 3 forces S<sub>H</sub> under override even though (4) also admits S<sub>HM</sub> and S<sub>M→H</sub>.</li>
+      <li>With a machine advantage from S<sub>H</sub>, the rule returns S<sub>H→M</sub> without checking (7), so a time-critical case with a machine advantage enters an excluded handover state.</li>
+      <li>When no other condition holds, the rule returns S<sub>N</sub> without checking (7), so a time-critical, ambiguous case enters excluded negotiation.</li>
+      <li>The safety override forces S<sub>H</sub> even though (4) also admits S<sub>HM</sub> and S<sub>M→H</sub>.</li>
       <li>The compact rule jumps straight to S<sub>M</sub> and is stateless; the published rule depends on q<sub>t</sub> and passes through the handover states.</li>
     </ul>
     <p><b>Behaviour of the published rule that the simulator exposes</b> (see the transition map on the Rollout tab):</p>
@@ -667,7 +721,7 @@ tr.cur td{background:var(--accent-soft)}
       <li>Every branch checks A(x<sub>t</sub>), so the result is always admissible (0 violations in 400,000 random contexts).</li>
       <li>A clear machine advantage (Δ ≥ θ<sub>M</sub>) starts a handover from any non-machine state, including S<sub>HM</sub> and S<sub>N</sub>; a clear human advantage (Δ ≤ −θ<sub>H</sub>) returns any non-machine state to S<sub>H</sub>. Negotiation and shared control can therefore always be left.</li>
       <li>An interrupted transfer reverses: S<sub>H→M</sub> with a human advantage returns to S<sub>H</sub>; S<sub>M→H</sub> with a machine advantage returns to S<sub>M</sub>.</li>
-      <li>When TC ≥ κ excludes the handover states, a transfer is made directly (lines 8 and 11) instead of entering an excluded state.</li>
+      <li>When TC ≥ κ excludes the handover states, a transfer is made directly instead of entering an excluded state.</li>
       <li>An override, ethical-risk or fairness trigger in machine-led control passes through the logged return S<sub>M→H</sub> when it is admissible, so the most safety-relevant transfer is also visible.</li>
       <li>When no allocation rule applies, the paper's choice (S<sub>N</sub>) is kept by default. The alternative “hold” keeps a stable state instead, which treats the gap between ε and θ as a hysteresis band.</li>
     </ul>
@@ -685,7 +739,7 @@ tr.cur td{background:var(--accent-soft)}
     <ul>
       <li>Responsibility inputs are built from family profiles and keywords only, never from the selected state, so in the validation responsibility is not coupled to the authority regime.</li>
       <li>By construction TC cannot exceed 0.50 (κ = 0.80), ER reaches at most 0.545 in the corpus (ρ = 0.70), and VA<sub>HM</sub> never falls below τ, so constraints (5, ethical-risk part), (6) and (7) are never exercised.</li>
-      <li>16 of the 26 human-led outcomes come from line 3, triggered by the keyword flags HO (“override”, “veto”, …) and FC (“bias”, “neighborhood”, …); only 10 come from a human strength advantage.</li>
+      <li>16 of the 26 human-led outcomes come from the safety override, triggered by the keyword flags HO (“override”, “veto”, …) and FC (“bias”, “neighborhood”, …); only 10 come from a human strength advantage.</li>
     </ul>
   </div>
 </div>
@@ -694,7 +748,7 @@ tr.cur td{background:var(--accent-soft)}
 </div>
 
 <script>
-/* M-CSM reference engine — implements eqs. (2)–(12) and Algorithm 1 of
+/* M-CSM reference engine — implements eqs. (2)–(12) and the transition rules of
    "M-CSM: A Governance-Oriented Complementary Strength Model for Hybrid
    Human–Machine Decision-Making". Pure functions, no DOM. */
 var MCSM = (function () {
@@ -968,12 +1022,140 @@ var MCSM = (function () {
     return { rows: rows, transfers: transfers, untraced: untraced, violations: violations, zeroChi: Object.keys(zeroStates) };
   }
 
+
+  /* ------------------------------------------------------------------
+     Reproducible experiments (used by the simulator tabs and by Node)
+     ------------------------------------------------------------------ */
+  var INPUT_KEYS = CONT_INPUTS.concat(['FC', 'HO']);
+  var MODES = ['literal', 'enforced', 'eq8', 'revised'];
+
+  // Seeded pseudo-random generator (mulberry32): same seed, same sequence everywhere
+  function rng(seed) {
+    var a = seed | 0;
+    return function () {
+      a |= 0; a = a + 0x6D2B79F5 | 0;
+      var t = Math.imul(a ^ a >>> 15, 1 | a);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+
+  /* Monte Carlo comparison of the four transition rules.
+     o: {N, seed, q:'random'|state, pHO, pFC, p}
+     Each context: the 11 continuous inputs uniform on [0,1], FC ~ Bernoulli(pFC),
+     HO ~ Bernoulli(pHO), and (if q is 'random') the current state uniform over the six states.
+     compareInit + compareStep allow the work to be done in chunks; compareRules does it in one call. */
+  function compareInit(o) {
+    var R = { N: o.N, seed: o.seed, q: o.q || 'random', pHO: o.pHO, pFC: o.pFC, p: clone(o.p), i: 0,
+              next: {}, viol: {}, byC: {}, stable: {}, dis: {}, pairs: {}, rnd: rng(o.seed) };
+    MODES.forEach(function (m) {
+      R.next[m] = {}; R.viol[m] = 0; R.byC[m] = { '(4)': 0, '(5)': 0, '(6)': 0, '(7)': 0 }; R.stable[m] = {};
+    });
+    return R;
+  }
+  function compareStep(R, count, onSample) {
+    var end = Math.min(R.N, R.i + count), rnd = R.rnd, p = R.p;
+    for (; R.i < end; R.i++) {
+      var x = {}, k;
+      for (k = 0; k < 11; k++) x[CONT_INPUTS[k]] = rnd();
+      x.FC = rnd() < R.pFC ? 1 : 0; x.HO = rnd() < R.pHO ? 1 : 0;
+      var q = R.q === 'random' ? STATES[Math.floor(rnd() * 6)] : R.q;
+      var d = scores(x, p).delta, nx = [], vi = [], chosen = [];
+      for (var j = 0; j < 4; j++) {
+        var m = MODES[j], r = decide(q, d, x, p, m);
+        // for 'enforced', r.violation describes the published choice before it is replaced by S_H
+        chosen.push(m === 'enforced' ? chosen[0] : r.next);
+        R.next[m][r.next] = (R.next[m][r.next] || 0) + 1;
+        if (r.violation) {
+          R.viol[m]++;
+          var why = r.A.excluded[chosen[j]] || [], seen = {};
+          for (var w = 0; w < why.length; w++) { var c = why[w].slice(0, 3); if (!seen[c]) { seen[c] = 1; R.byC[m][c]++; } }
+        }
+        nx.push(r.next); vi.push(r.violation);
+        var ro = rollout(q, x, p, m, 20), key = ro.stable ? ro.final : (ro.cycle ? 'cycle' : 'none');
+        R.stable[m][key] = (R.stable[m][key] || 0) + 1;
+      }
+      for (var a = 0; a < 4; a++) for (var b = a + 1; b < 4; b++) if (nx[a] !== nx[b]) { var kk = a + '-' + b; R.dis[kk] = (R.dis[kk] || 0) + 1; }
+      if (nx[0] !== nx[3]) { var pk = q + '|' + nx[0] + '|' + nx[3]; R.pairs[pk] = (R.pairs[pk] || 0) + 1; }
+      if (onSample) onSample({ q: q, x: x, next: nx, viol: vi });
+    }
+    return R.i >= R.N;
+  }
+  function compareRules(o) { var R = compareInit(o); compareStep(R, R.N, o.onSample); return R; }
+
+  // 95 % Wilson confidence interval for a proportion k/n
+  function wilson(k, n) {
+    if (!n) return [0, 0];
+    var z = 1.959964, ph = k / n, den = 1 + z * z / n, mid = (ph + z * z / (2 * n)) / den;
+    var half = z * Math.sqrt(ph * (1 - ph) / n + z * z / (4 * n * n)) / den;
+    return [Math.max(0, mid - half), Math.min(1, mid + half)];
+  }
+
+  /* Scripted story: base context plus changes [{t, key, v, r}] over T epochs.
+     From epoch t the input moves to v, at once (r = 0) or linearly over r epochs. */
+  function storyInputs(base, events, T) {
+    var xs = [], ser = {}, t;
+    INPUT_KEYS.forEach(function (k) { ser[k] = []; for (var u = 0; u < T; u++) ser[k][u] = base[k]; });
+    events.slice().sort(function (a, b) { return a.t - b.t; }).forEach(function (e) {
+      var k = e.key; if (!ser[k]) return;
+      var bin = (k === 'FC' || k === 'HO'), t0 = Math.max(0, Math.min(T - 1, Math.round(e.t)));
+      var from = t0 > 0 ? ser[k][t0 - 1] : base[k], r = bin ? 0 : Math.max(0, Math.round(e.r || 0));
+      var v = bin ? (e.v >= 0.5 ? 1 : 0) : clip01(+e.v);
+      for (var u = t0; u < T; u++) ser[k][u] = (r > 0 && u < t0 + r) ? from + (v - from) * (u - t0 + 1) / r : v;
+    });
+    for (t = 0; t < T; t++) { var x = {}; INPUT_KEYS.forEach(function (k) { x[k] = ser[k][t]; }); xs.push(x); }
+    return { xs: xs, ser: ser };
+  }
+  function runStory(base, events, T, q0, p, mode) {
+    var si = storyInputs(base, events, T), q = q0, rows = [];
+    si.xs.forEach(function (x, t) { var r = step(q, x, p, mode); r.t = t; rows.push(r); q = r.next; });
+    return { rows: rows, inputs: si };
+  }
+
+  /* Tipping points: for each continuous input, the nearest value below and above the
+     current one at which the next state changes (all other inputs held fixed). */
+  function tippingPoints(q, x, p, mode) {
+    function sig(r) { return r.next + (r.violation && !r.fallback ? '!' : ''); }
+    function at(k, v) { var x2 = clone(x); x2[k] = v; return step(q, x2, p, mode); }
+    var b0 = step(q, x, p, mode), base = sig(b0);
+    function find(k, dir) {
+      var v0 = x[k], prev = v0, v = v0;
+      while (true) {
+        v = dir > 0 ? Math.min(1, prev + 0.01) : Math.max(0, prev - 0.01);
+        if (v === prev) return null;
+        if (sig(at(k, v)) !== base) {
+          var lo = prev, hi = v; // lo keeps the current result, hi does not
+          for (var i = 0; i < 20; i++) { var mid = (lo + hi) / 2; if (sig(at(k, mid)) === base) lo = mid; else hi = mid; }
+          var r = at(k, hi);
+          return { at: hi, to: r.next, forbidden: r.violation && !r.fallback, change: hi - v0 };
+        }
+        prev = v;
+      }
+    }
+    return { base: b0.next, forbidden: b0.violation && !b0.fallback,
+             rows: CONT_INPUTS.map(function (k) { return { key: k, value: x[k], down: find(k, -1), up: find(k, 1) }; }) };
+  }
+
+  /* Scenario replay as in the validation notebook: start in S_H, repeat for up to four epochs. */
+  function replayScenario(x, p, mode) {
+    var q = 'S_H', first = null, viol = false;
+    for (var k = 0; k < 4; k++) { var r = step(q, x, p, mode); if (first === null) first = r; if (r.violation) viol = true; if (r.next === q) break; q = r.next; }
+    return { one: first, stable: q, viol: viol };
+  }
+  function scenarioCounts(list, p, mode) {
+    var c = {}; STATES.forEach(function (s) { c[s] = 0; });
+    list.forEach(function (sc) { c[replayScenario(sc.x, p, mode).stable]++; });
+    return c;
+  }
+
   return {
     STATES: STATES, STATE_LABEL: STATE_LABEL, HOLDER: HOLDER, DEFAULT_PARAMS: DEFAULT_PARAMS,
     RESP_PRESETS: RESP_PRESETS, CONT_INPUTS: CONT_INPUTS,
     strength: strength, scores: scores, admissible: admissible, step: step, decide: decide, transitionMap: transitionMap, rollout: rollout,
     responsibility: responsibility, sensitivity: sensitivity, perturbRun: perturbRun,
-    normWeights: normWeights, clone: clone, clip01: clip01
+    normWeights: normWeights, clone: clone, clip01: clip01,
+    INPUT_KEYS: INPUT_KEYS, MODES: MODES, rng: rng, compareInit: compareInit, compareStep: compareStep, compareRules: compareRules, wilson: wilson,
+    storyInputs: storyInputs, runStory: runStory, tippingPoints: tippingPoints, replayScenario: replayScenario, scenarioCounts: scenarioCounts
   };
 })();
 if (typeof module !== 'undefined') module.exports = MCSM;
@@ -1013,7 +1195,7 @@ var EXAMPLES = [
     x:{CP_H:.70,TR_H:.80,VA_H:.85,UC_H:.30,CP_M:.95,TR_M:.90,VA_M:.80,UC_M:.10,VA_HM:.70,ER:.80,TC:.40,FC:0,HO:0} },
   { name:'Time-critical, ambiguous', q:'S_H', note:'The published rule returns S_N, which constraint (7) excludes. Switch policy modes to compare.',
     x:{CP_H:.70,TR_H:.80,VA_H:.85,UC_H:.30,CP_M:.80,TR_M:.90,VA_M:.70,UC_M:.10,VA_HM:.70,ER:.30,TC:.90,FC:0,HO:0} },
-  { name:'Time-critical, machine advantage', q:'S_H', note:'Line 6 returns the handover state S_H→M, which constraint (7) excludes.',
+  { name:'Time-critical, machine advantage', q:'S_H', note:'The published rule returns the handover state S_H→M, which constraint (7) excludes.',
     x:{CP_H:.70,TR_H:.80,VA_H:.85,UC_H:.30,CP_M:.95,TR_M:.90,VA_M:.80,UC_M:.10,VA_HM:.70,ER:.30,TC:.90,FC:0,HO:0} }
 ];
 
@@ -1267,13 +1449,13 @@ function drawAlgo(res){
   var box=$('algo'); box.innerHTML='';
   var bad = res.violation && S.mode!=='enforced';
   if (S.mode==='eq8'){
-    $('algoTitle').textContent='Compact rule — case that fired';
+    $('algoTitle').textContent='Compact rule — condition that applied';
     var hit=parseInt(String(res.line).split(':')[1],10);
     EQ8.forEach(function(l,i){ var d=document.createElement('div'); d.innerHTML='<span class="ln">'+(i+1)+'</span>'+l.replace(/[<>&]/g,function(c){return {'<':'&lt;','>':'&gt;','&':'&amp;'}[c];}); if (i+1===hit) d.className='hit'+(bad?' bad':''); box.appendChild(d); });
     return;
   }
   if (S.mode==='revised'){
-    $('algoTitle').textContent='Admissibility-preserving rule — line that fired';
+    $('algoTitle').textContent='Admissibility-preserving rule — condition that applied';
     var off = (S.p.deadBand||'negotiate')==='negotiate' ? 16 : 15;
     ALG_R.forEach(function(l){
       var n=parseInt(l,10), d=document.createElement('div');
@@ -1284,7 +1466,7 @@ function drawAlgo(res){
     });
     return;
   }
-  $('algoTitle').textContent='Published rule — line that fired';
+  $('algoTitle').textContent='Published rule — condition that applied';
   ALG.forEach(function(l){
     var n=parseInt(l,10), d=document.createElement('div');
     var body=l.replace(/^\d+:\s?/,'').replace(/[<>&]/g,function(c){return {'<':'&lt;','>':'&gt;','&':'&amp;'}[c];});
@@ -1344,6 +1526,7 @@ function renderEpoch(res){
     ? 'All '+sens.n+' one-at-a-time changes keep the next state at <b>'+TXT[sens.base]+'</b>.'
     : '<b>'+sens.flips.length+' of '+sens.n+'</b> one-at-a-time changes move the next state away from <b>'+TXT[sens.base]+'</b>.';
   $('sensTable').innerHTML = sens.flips.length ? '<thead><tr><th>Change</th><th>New next state</th></tr></thead><tbody>'+sens.flips.map(function(f){return '<tr><td class="mono">'+f.label+'</td><td>'+SHORT[f.to]+' '+M.STATE_LABEL[f.to]+'</td></tr>';}).join('')+'</tbody>' : '';
+  renderTips();
 }
 
 /* ---------- rollout & log ---------- */
@@ -1363,7 +1546,7 @@ function renderTmap(){
     tm.rows.map(function(row){ return '<tr><td>'+SHORT[row.q]+'</td>'+row.cells.map(function(c){ var bad=c.violation&&S.mode!=='enforced'; return '<td style="'+(bad?'background:var(--warn-soft)':'')+'"><span class="sw" style="background:'+SCOL[c.next]+'"></span>'+SHORT[c.next]+(c.fallback?' <span class="small muted">(fallback)</span>':'')+(bad?' <span class="small" style="color:var(--warn)">excluded</span>':'')+'</td>'; }).join('')+'</tr>'; }).join('')+'</tbody>';
   var nRow=tm.rows.filter(function(r){ return r.q==='S_N'; })[0];
   var trapped=(S.mode==='literal'||S.mode==='enforced') && nRow.cells.every(function(c){ return c.next==='S_N'||c.next==='S_HM'||c.gov; }) && nRow.cells.some(function(c){ return c.next==='S_N'; });
-  $('tmapNote').innerHTML = trapped ? 'With these signals, S<sub>N</sub> can only be left for S<sub>HM</sub> (|Δ| &lt; ε): a clear human or machine advantage keeps it in negotiation. Only line 3 (override, ethical risk, fairness) returns it to S<sub>H</sub>.' : '';
+  $('tmapNote').innerHTML = trapped ? 'With these signals, S<sub>N</sub> can only be left for S<sub>HM</sub> (|Δ| &lt; ε): a clear human or machine advantage keeps it in negotiation. Only the safety override (override, ethical risk, fairness) returns it to S<sub>H</sub>.' : '';
 }
 var LOG_COLS=['epoch','mode','q_t','CP_H','TR_H','VA_H','UC_H','CP_M','TR_M','VA_M','UC_M','VA_HM','ER','TC','FC','HO','S_H','S_M','delta','admissible','rule_line','q_t+1','admissible_result','fallback','reason'];
 function logRow(res){
@@ -1407,6 +1590,7 @@ function renderResp(fromInput){
   $('respState').value=S.respState;
   if (!fromInput) ['H','M','G'].forEach(function(i){ FACT.forEach(function(f){ $('rf-'+i+'-'+f[0]).value=P[i][f[0]]; }); });
   ySync.sync();
+  renderRespAll();
   var r=M.responsibility(P,S.y,S.p);
   var svg=$('respChart'); clear(svg);
   if (!r.ok){ el('text',{x:20,y:40,'font-size':13,fill:'var(--warn)'},svg,'All contributions χ are zero, so ψ in eq. (9) is undefined.'); $('respTable').innerHTML=''; $('respCheck').textContent=''; return; }
@@ -1505,7 +1689,7 @@ function renderP3(){
   else if (Math.abs(dA)<1e-9 && Math.abs(dB)<1e-9) read='The perturbation does not change the regime or the gap under these settings. The test is not exercised: try a larger perturbation or a different start state.';
   else {
     var wid = (dB>dA+1e-9)?'widens more without the handover log':((dA>dB+1e-9)?'widens more with the handover log':'moves equally in both conditions');
-    read='Under this perturbation the mean gap '+wid+' ('+fmt(dA)+' logged vs '+fmt(dB)+' unlogged). P3 would be falsified if the gap did not widen, or widened equally with and without tracing. These numbers follow from the illustrative presets and the outcome model listed under Parameters & notes; they show how the test works, not its result.';
+    read='Under this perturbation the mean gap '+wid+' ('+fmt(dA)+' logged vs '+fmt(dB)+' unlogged). P3 would be falsified if the gap did not widen, or widened equally with and without tracing. These numbers follow from the illustrative presets and the outcome model listed under Parameters; they show how the test works, not its result.';
   }
   $('p-read').textContent=read;
   // table
@@ -1530,9 +1714,9 @@ var REPORTED = {S_H:26,S_HM:45,S_N:28,S_M:1};
   });
 })();
 function replayOne(sc){
-  var q='S_H', first=null, viol=false;
-  for (var k=0;k<4;k++){ var r=M.step(q,sc.x,S.p,S.mode); if(first===null) first=r; if(r.violation) viol=true; if(r.next===q) break; q=r.next; }
-  return { one:first, stable:q, viol:viol, resp:M.responsibility(sc.P||S.presets[q],sc.y!=null?sc.y:S.y,S.p) };
+  var r=M.replayScenario(sc.x,S.p,S.mode), rp=M.responsibility(sc.P||S.presets[r.stable],sc.y!=null?sc.y:S.y,S.p);
+  if (!rp.ok) rp={ok:false,rows:{H:{R:NaN},M:{R:NaN},G:{R:NaN}}};
+  return { one:r.one, stable:r.stable, viol:r.viol, resp:rp };
 }
 function renderScen(){
   var res=SCEN_ACTIVE.map(replayOne), counts={}, match=0, mH=0,mM=0,mG=0;
@@ -1552,7 +1736,9 @@ function renderScen(){
     var flags=(sc.x.HO?'HO ':'')+(sc.x.FC?'FC':'');
     return '<tr><td class="n">'+sc.id+'</td><td class="mono">'+sc.f+'</td><td style="white-space:normal;min-width:16em">'+sc.t+'</td><td class="n">'+fmt(r.one.delta)+'</td><td class="mono small">'+(flags||'—')+'</td><td>'+SHORT[r.one.next]+'<br><span class="small muted">'+ruleReason(S.mode,r.one)+'</span></td><td><span class="sw" style="background:'+SCOL[r.stable]+'"></span>'+SHORT[r.stable]+(r.viol?' <span class="pill bad">excluded</span>':'')+'</td><td class="n">'+(100*r.resp.rows.H.R).toFixed(1)+'</td><td class="n">'+(100*r.resp.rows.M.R).toFixed(1)+'</td><td class="n">'+(100*r.resp.rows.G.R).toFixed(1)+'</td><td>'+(!sc.os?'—':ok?'<span style="color:var(--ok)">✓</span>':'<span style="color:var(--warn)">'+TXT[sc.os]+'</span>')+'</td><td><button class="btn" type="button" data-idx="'+i+'">Open</button></td></tr>'; }).join('');
   $('sc-shown').textContent=shown+' shown';
-  $('sc-table').innerHTML='<thead><tr><th>#</th><th>Fam.</th><th>Scenario</th><th class="n">Δ</th><th>Flags</th><th>One step</th><th>Stable</th><th class="n">R<sub>H</sub> %</th><th class="n">R<sub>M</sub> %</th><th class="n">R<sub>G</sub> %</th><th>Notebook</th><th></th></tr></thead><tbody>'+rows+'</tbody>';
+  $('sc-table').innerHTML='<thead><tr><th>#</th><th>Fam.</th><th>Scenario</th><th class="n">Δ</th><th>Flags</th><th>One step</th><th>Stable</th><th class="n">R<sub>H</sub> %</th><th class="n">R<sub>M</sub> %</th><th class="n">R<sub>G</sub> %</th><th>Notebook</th><th></th></tr></thead><tbody>'+String(rows).replace(/NaN/g,'—')+'</tbody>';
+  $('sc-kpis').innerHTML=$('sc-kpis').innerHTML.replace(/NaN/g,'—');
+  renderScenExtra();
 }
 
 /* ---------- 3D strength landscape (hand-drawn on canvas, no library) ---------- */
@@ -1684,6 +1870,10 @@ function renderPar(fromInput){
   var sH=S.p.wH.reduce(function(a,b){return a+b;},0), sM=S.p.wM.reduce(function(a,b){return a+b;},0);
   var ok=Math.abs(sH-1)<1e-6&&Math.abs(sM-1)<1e-6;
   $('wNote').innerHTML = ok ? '<span style="color:var(--ok)">Both weight vectors sum to 1, as eq. (2) requires.</span>' : '<span style="color:var(--warn)">Eq. (2) requires each weight vector to sum to 1. Current sums: w<sup>H</sup> '+sH.toFixed(2)+', w<sup>M</sup> '+sM.toFixed(2)+'. Scores are computed as entered.</span>';
+  var tp_=S.p, warn=[];
+  if (tp_.eps>=tp_.thetaM||tp_.eps>=tp_.thetaH) warn.push('ε should be smaller than θ<sub>M</sub> and θ<sub>H</sub>; otherwise the balanced band overlaps a region where one agent is clearly stronger');
+  ['thetaM','thetaH','eps','rho','tau','kappa'].forEach(function(k){ if (tp_[k]<0||tp_[k]>1) warn.push(k+' is outside 0 to 1'); });
+  $('thNote').innerHTML = warn.length ? '<span style="color:var(--warn)">'+warn.join('. ')+'.</span>' : '<span style="color:var(--ok)">Thresholds are consistent: ε lies below θ<sub>M</sub> and θ<sub>H</sub>.</span>';
 }
 
 /* ---------- master render ---------- */
@@ -1839,17 +2029,7 @@ function loadPreset(k){
   BUILD.cursor=null;
 }
 loadPreset('drop');
-function storyInputs(B){
-  var T=B.T, xs=[], ser={};
-  ALL_KEYS.forEach(function(k){ ser[k]=[]; for (var t=0;t<T;t++) ser[k][t]=B.base[k]; });
-  B.events.slice().sort(function(a,b){ return a.t-b.t; }).forEach(function(e){
-    var k=e.key, bin=(k==='FC'||k==='HO'), t0=Math.max(0,Math.min(T-1,Math.round(e.t))), from=t0>0?ser[k][t0-1]:B.base[k], r=bin?0:Math.max(0,Math.round(e.r||0));
-    var v=bin?(e.v>=0.5?1:0):M.clip01(+e.v);
-    for (var t=t0;t<T;t++) ser[k][t]= (r>0 && t<t0+r) ? from+(v-from)*(t-t0+1)/r : v;
-  });
-  for (var t=0;t<T;t++){ var x={}; ALL_KEYS.forEach(function(k){ x[k]=ser[k][t]; }); xs.push(x); }
-  return {xs:xs, ser:ser};
-}
+function storyInputs(B){ return M.storyInputs(B.base,B.events,B.T); }
 function runStory(){
   var si=storyInputs(BUILD), runs={};
   MODES.forEach(function(m){
@@ -2007,7 +2187,6 @@ function drawBuild(){
    Rule comparison lab
    ===================================================================== */
 var CMP={res:null,running:false,samples:null};
-function mulberry32(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; var t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
 (function buildCmp(){
   var s=$('c-q'); var o=document.createElement('option'); o.value='random'; o.textContent='Random (each state equally likely)'; s.appendChild(o); fillStateSelect(s); s.value='random';
   $('c-run').addEventListener('click',runCmp);
@@ -2021,43 +2200,24 @@ function mulberry32(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; var t=Math.im
 function runCmp(){
   if (CMP.running) return;
   var N=+$('c-n').value, qSel=$('c-q').value, pHO=M.clip01(+$('c-ho').value||0), pFC=M.clip01(+$('c-fc').value||0), seed=Math.round(+$('c-seed').value||0);
-  var rnd=mulberry32(seed), p=M.clone(S.p), i=0, chunk=2500, keep=N<=50000;
-  var R={N:N,seed:seed,q:qSel,pHO:pHO,pFC:pFC,next:{},viol:{},byC:{},stable:{},dis:{},pairs:{},n:0};
-  MODES.forEach(function(m){ R.next[m[0]]={}; R.viol[m[0]]=0; R.byC[m[0]]={'(4)':0,'(5)':0,'(6)':0,'(7)':0}; R.stable[m[0]]={cycle:0,none:0}; });
-  var samples=keep?[]:null;
+  var R=M.compareInit({N:N,seed:seed,q:qSel,pHO:pHO,pFC:pFC,p:S.p}), samples=N<=50000?[]:null;
+  R.sig=JSON.stringify(S.p);
   CMP.running=true; $('c-run').disabled=true;
   (function work(){
-    var end=Math.min(N,i+chunk);
-    for (;i<end;i++){
-      var x={}; for (var k=0;k<11;k++) x[ALL_KEYS[k]]=rnd(); x.FC=rnd()<pFC?1:0; x.HO=rnd()<pHO?1:0;
-      var q=qSel==='random'?M.STATES[Math.floor(rnd()*6)]:qSel, sc=M.scores(x,p), nx=[], vi=[];
-      MODES.forEach(function(m){
-        var r=M.decide(q,sc.delta,x,p,m[0]);
-        R.next[m[0]][r.next]=(R.next[m[0]][r.next]||0)+1;
-        var forb=r.violation; // for enforced, violation describes the published choice before replacement
-        if (forb){ R.viol[m[0]]++; var why=(r.A.excluded[m[0]==='enforced'?M.decide(q,sc.delta,x,p,'literal').next:r.next]||[]);
-          var seen={}; why.forEach(function(w){ var c=w.slice(0,3); if(!seen[c]){ seen[c]=1; R.byC[m[0]][c]=(R.byC[m[0]][c]||0)+1; } }); }
-        nx.push(r.next); vi.push(forb);
-        var ro=M.rollout(q,x,p,m[0],20); var key=ro.stable?ro.final:(ro.cycle?'cycle':'none');
-        R.stable[m[0]][key]=(R.stable[m[0]][key]||0)+1;
-      });
-      for (var a=0;a<4;a++) for (var b=a+1;b<4;b++) if (nx[a]!==nx[b]){ var kk=a+'-'+b; R.dis[kk]=(R.dis[kk]||0)+1; }
-      if (nx[0]!==nx[3]){ var pk=TXT[q]+'|'+TXT[nx[0]]+'|'+TXT[nx[3]]; R.pairs[pk]=(R.pairs[pk]||0)+1; }
-      if (samples) samples.push({q:q,x:x,next:nx,viol:vi});
-    }
-    R.n=i; $('c-status').textContent='Running… '+Math.round(100*i/N)+' %';
-    if (i<N) setTimeout(work,0);
-    else { CMP.running=false; $('c-run').disabled=false; CMP.res=R; CMP.samples=samples; $('c-samples').disabled=!samples;
-      $('c-status').textContent=N.toLocaleString('en')+' contexts · seed '+seed+' · '+(qSel==='random'?'random current state':'from '+TXT[qSel]); renderCmp(); }
+    var done=M.compareStep(R,2500,samples?function(sm){ samples.push(sm); }:null);
+    $('c-status').textContent='Running… '+Math.round(100*R.i/N)+' %';
+    if (!done) setTimeout(work,0);
+    else { CMP.running=false; $('c-run').disabled=false; CMP.res=R; CMP.samples=samples; $('c-samples').disabled=!samples; renderCmp(); }
   })();
 }
 function pct(a,n,d){ return (100*a/n).toFixed(d==null?1:d)+' %'; }
 function renderCmp(){
   var R=CMP.res;
-  if (!R){ $('c-kpis').innerHTML='<p class="small muted">Press Run to compare the four rules.</p>'; return; }
+  if (!R){ $('c-kpis').innerHTML='<p class="small muted">Press Run to compare the four rules.</p>'; ['c-dist','c-viol'].forEach(function(id){ clear($(id)); }); ['c-dis','c-stable','c-pairs'].forEach(function(id){ $(id).innerHTML=''; }); $('c-distLegend').innerHTML=''; return; }
   var N=R.N;
-  $('c-kpis').innerHTML=MODES.map(function(m){ var v=R.viol[m[0]];
-    return '<div class="kpi"><h3>'+m[1]+'</h3><span class="v" style="color:'+(v?'var(--warn)':'var(--ok)')+'">'+pct(v,N)+'</span><span class="small muted">'+(m[0]==='enforced'?'forbidden before fallback, 0 % after':'of contexts give a forbidden state')+'</span></div>'; }).join('');
+  if (!CMP.running) $('c-status').innerHTML=N.toLocaleString('en')+' contexts · seed '+R.seed+' · '+(R.q==='random'?'random current state':'from '+TXT[R.q])+(R.sig!==JSON.stringify(S.p)?' · <span class="stale">weights or thresholds have changed since this run; press Run to update</span>':'');
+  $('c-kpis').innerHTML=MODES.map(function(m){ var v=R.viol[m[0]], ci=M.wilson(v,N);
+    return '<div class="kpi"><h3>'+m[1]+'</h3><span class="v" style="color:'+(v?'var(--warn)':'var(--ok)')+'">'+pct(v,N)+'</span><span class="small muted">'+(m[0]==='enforced'?'forbidden before fallback, 0 % after':'of contexts give a forbidden state')+' · 95 % interval '+(100*ci[0]).toFixed(1)+'–'+(100*ci[1]).toFixed(1)+' %</span></div>'; }).join('');
   // distribution chart
   var g=$('c-dist'); clear(g); var x0=170, x1=590, W=x1-x0;
   MODES.forEach(function(m,j){
@@ -2092,7 +2252,7 @@ function renderCmp(){
   // pairs
   var pairs=Object.keys(R.pairs).map(function(k){ return [k,R.pairs[k]]; }).sort(function(a,b){ return b[1]-a[1]; }).slice(0,12);
   $('c-pairs').innerHTML='<thead><tr><th>From q<sub>t</sub></th><th>Published rule</th><th>Admissibility-preserving rule</th><th class="n">Contexts</th><th class="n">Share</th></tr></thead><tbody>'+
-    (pairs.length?pairs.map(function(pr){ var z=pr[0].split('|'); return '<tr><td>'+z[0]+'</td><td>'+z[1]+'</td><td>'+z[2]+'</td><td class="n">'+pr[1].toLocaleString('en')+'</td><td class="n">'+pct(pr[1],N)+'</td></tr>'; }).join(''):'<tr><td colspan="5">The two rules agree on every sampled context.</td></tr>')+'</tbody>';
+    (pairs.length?pairs.map(function(pr){ var z=pr[0].split('|').map(function(t){ return TXT[t]||t; }); return '<tr><td>'+z[0]+'</td><td>'+z[1]+'</td><td>'+z[2]+'</td><td class="n">'+pr[1].toLocaleString('en')+'</td><td class="n">'+pct(pr[1],N)+'</td></tr>'; }).join(''):'<tr><td colspan="5">The two rules agree on every sampled context.</td></tr>')+'</tbody>';
 }
 
 /* =====================================================================
@@ -2149,24 +2309,46 @@ function b64d(s){ s=s.replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4) s+=
 function settingsObj(){
   return {v:1, tab:S.tab, mode:S.mode, x:S.x, q:S.q, p:S.p, presets:S.presets, respState:S.respState, respFollow:S.respFollow, y:S.y, p3:S.p3,
     land:{xKey:LAND.xKey,yKey:LAND.yKey}, story:{T:BUILD.T,q0:BUILD.q0,base:BUILD.base,events:BUILD.events,preset:BUILD.preset},
-    cmp:{n:$('c-n').value,q:$('c-q').value,ho:$('c-ho').value,fc:$('c-fc').value,seed:$('c-seed').value}};
+    cmp:{n:$('c-n').value,q:$('c-q').value,ho:$('c-ho').value,fc:$('c-fc').value,seed:$('c-seed').value}, tx:{x:TX.x,y:TX.y,s:TX.s}};
 }
 function applySettings(o){
-  if (!o||typeof o!=='object') throw new Error('not a settings file');
-  if (o.mode&&['literal','enforced','eq8','revised'].indexOf(o.mode)>=0) S.mode=o.mode;
-  if (o.x) ALL_KEYS.forEach(function(k){ if (typeof o.x[k]==='number') S.x[k]=(k==='FC'||k==='HO')?(o.x[k]>=.5?1:0):M.clip01(o.x[k]); });
-  if (o.q&&M.STATES.indexOf(o.q)>=0) S.q=o.q;
-  if (o.p) Object.keys(M.DEFAULT_PARAMS).forEach(function(k){ if (o.p[k]!=null) S.p[k]=o.p[k]; });
-  if (o.presets) M.STATES.forEach(function(s){ if (o.presets[s]) S.presets[s]=o.presets[s]; });
-  if (o.respState&&M.STATES.indexOf(o.respState)>=0) S.respState=o.respState;
+  if (!o||typeof o!=='object'||Array.isArray(o)) throw new Error('not a settings file');
+  var num=function(v){ return typeof v==='number'&&isFinite(v); }, numArr=function(a,n){ return Array.isArray(a)&&a.length===n&&a.every(function(v){ return num(v)&&v>=0; }); };
+  if (['literal','enforced','eq8','revised'].indexOf(o.mode)>=0) S.mode=o.mode;
+  if (o.x&&typeof o.x==='object') ALL_KEYS.forEach(function(k){ if (num(o.x[k])) S.x[k]=(k==='FC'||k==='HO')?(o.x[k]>=.5?1:0):M.clip01(o.x[k]); });
+  if (M.STATES.indexOf(o.q)>=0) S.q=o.q;
+  if (o.p&&typeof o.p==='object'){
+    ['thetaM','thetaH','eps','rho','tau','kappa'].forEach(function(k){ if (num(o.p[k])) S.p[k]=M.clip01(o.p[k]); });
+    if (numArr(o.p.wH,4)) S.p.wH=o.p.wH.slice(); if (numArr(o.p.wM,4)) S.p.wM=o.p.wM.slice();
+    if (numArr(o.p.alpha,3)) S.p.alpha=o.p.alpha.slice(); if (numArr(o.p.beta,4)) S.p.beta=o.p.beta.slice();
+    if (o.p.deadBand==='negotiate'||o.p.deadBand==='hold') S.p.deadBand=o.p.deadBand;
+  }
+  if (o.presets&&typeof o.presets==='object') M.STATES.forEach(function(st){ var P=o.presets[st]; if (!P||typeof P!=='object') return;
+    ['H','M','G'].forEach(function(i){ if (!P[i]||typeof P[i]!=='object') return; ['chi','a','k','f','d'].forEach(function(f){ if (num(P[i][f])) S.presets[st][i][f]=M.clip01(P[i][f]); }); }); });
+  if (M.STATES.indexOf(o.respState)>=0) S.respState=o.respState;
   if (typeof o.respFollow==='boolean') S.respFollow=o.respFollow;
-  if (typeof o.y==='number') S.y=M.clip01(o.y);
-  if (o.p3) Object.keys(S.p3).forEach(function(k){ if (o.p3[k]!=null) S.p3[k]=o.p3[k]; });
-  if (o.land){ if (LAND_KEYS.indexOf(o.land.xKey)>=0) LAND.xKey=o.land.xKey; if (LAND_KEYS.indexOf(o.land.yKey)>=0) LAND.yKey=o.land.yKey; }
-  if (o.story){ BUILD.T=o.story.T||BUILD.T; BUILD.q0=o.story.q0||BUILD.q0; if (o.story.base) BUILD.base=o.story.base; if (o.story.events) BUILD.events=o.story.events; BUILD.preset=o.story.preset||'custom'; }
-  if (o.cmp){ ['n','q','ho','fc','seed'].forEach(function(k){ if (o.cmp[k]!=null) $('c-'+k).value=o.cmp[k]; }); }
+  if (num(o.y)) S.y=M.clip01(o.y);
+  if (o.p3&&typeof o.p3==='object'){
+    if (o.p3.kind==='silent'||o.p3.kind==='latency') S.p3.kind=o.p3.kind;
+    if (M.STATES.indexOf(o.p3.q0)>=0) S.p3.q0=o.p3.q0;
+    ['T','onset','duration','magnitude','humanLoss','lag'].forEach(function(k){ if (num(o.p3[k])&&o.p3[k]>=0) S.p3[k]=o.p3[k]; });
+  }
+  if (o.land&&typeof o.land==='object'){ if (LAND_KEYS.indexOf(o.land.xKey)>=0) LAND.xKey=o.land.xKey; if (LAND_KEYS.indexOf(o.land.yKey)>=0) LAND.yKey=o.land.yKey; }
+  if (o.story&&typeof o.story==='object'){
+    if (num(o.story.T)) BUILD.T=Math.max(2,Math.min(200,Math.round(o.story.T)));
+    if (M.STATES.indexOf(o.story.q0)>=0) BUILD.q0=o.story.q0;
+    if (o.story.base&&typeof o.story.base==='object') ALL_KEYS.forEach(function(k){ if (num(o.story.base[k])) BUILD.base[k]=(k==='FC'||k==='HO')?(o.story.base[k]>=.5?1:0):M.clip01(o.story.base[k]); });
+    if (Array.isArray(o.story.events)) BUILD.events=o.story.events.filter(function(e){ return e&&ALL_KEYS.indexOf(e.key)>=0&&num(e.t)&&num(e.v); }).slice(0,200).map(function(e){ return {t:Math.max(0,Math.round(e.t)),key:e.key,v:M.clip01(e.v),r:num(e.r)?Math.max(0,Math.round(e.r)):0}; });
+    BUILD.preset=(typeof o.story.preset==='string'&&STORY_PRESETS[o.story.preset])?o.story.preset:'custom'; BUILD.cursor=null;
+  }
+  if (o.cmp&&typeof o.cmp==='object'){
+    if (['2000','10000','50000','200000'].indexOf(String(o.cmp.n))>=0) $('c-n').value=String(o.cmp.n);
+    if (o.cmp.q==='random'||M.STATES.indexOf(o.cmp.q)>=0) $('c-q').value=o.cmp.q;
+    ['ho','fc','seed'].forEach(function(k){ if (o.cmp[k]!=null&&isFinite(+o.cmp[k])) $('c-'+k).value=+o.cmp[k]; });
+  }
+  if (o.tx&&typeof o.tx==='object'){ if (TX_R[o.tx.x]) TX.x=o.tx.x; if (TX_R[o.tx.y]) TX.y=o.tx.y; if (M.STATES.indexOf(o.tx.s)>=0) TX.s=o.tx.s; }
   Array.prototype.forEach.call($('modeSeg').querySelectorAll('button'),function(b){ b.setAttribute('aria-pressed',b.getAttribute('data-mode')===S.mode?'true':'false'); });
-  return o.tab&&TABS.indexOf(o.tab)>=0?o.tab:null;
+  return TABS.indexOf(o.tab)>=0?o.tab:null;
 }
 (function buildShare(){
   var pop=$('sharePop'), btn=$('shareBtn');
@@ -2181,7 +2363,7 @@ function applySettings(o){
   });
   $('shareSave').addEventListener('click',function(){ saveFile('mcsm-settings.json',JSON.stringify(settingsObj(),null,2),'application/json'); });
   $('shareLoad').addEventListener('change',function(){ readFile(this,function(txt){
-    try{ var t=applySettings(JSON.parse(txt)); $('shareMsg').textContent='Settings loaded.'; renderBuild(); showTab(t||S.tab); }
+    try{ var t=applySettings(JSON.parse(txt)); $('sharePop').hidden=true; $('shareBtn').setAttribute('aria-expanded','false'); renderBuild(); showTab(t||S.tab); toast('Settings loaded'); }
     catch(err){ $('shareMsg').textContent='Could not load: '+err.message; }
   }); });
 })();
@@ -2189,6 +2371,188 @@ function settingsFromHash(){
   var m=(location.hash||'').match(/[#&]s=([A-Za-z0-9_-]+)/); if (!m) return null;
   try{ return applySettings(JSON.parse(b64d(m[1]))); }catch(e){ return null; }
 }
+
+/* =====================================================================
+   v2 additions: tipping points, phone result bar, regimes chart,
+   family chart, threshold explorer, glossary, report, autosave
+   ===================================================================== */
+function renderTips(){
+  var tp=M.tippingPoints(S.q,S.x,S.p,S.mode), best=null;
+  function cell(d){
+    if (!d) return '<td class="n muted">—</td><td class="muted">—</td>';
+    return '<td class="n">'+d.at.toFixed(3)+' <span class="muted small">('+(d.change>0?'+':'−')+Math.abs(d.change).toFixed(3)+')</span></td>'+
+      '<td><span class="sw" style="background:'+SCOL[d.to]+'"></span>'+TXT[d.to]+(d.forbidden?' <b style="color:var(--warn)" title="forbidden by the constraints">✕</b>':'')+'</td>';
+  }
+  tp.rows.forEach(function(r){ [r.down,r.up].forEach(function(d){ if (d && (!best||Math.abs(d.change)<Math.abs(best.d.change))) best={r:r,d:d}; }); });
+  $('tipSummary').innerHTML = best
+    ? 'Closest tipping point: <b class="mono">'+best.r.key+'</b> from '+best.r.value.toFixed(2)+' to <b>'+best.d.at.toFixed(3)+'</b> ('+(best.d.change>0?'+':'−')+Math.abs(best.d.change).toFixed(3)+') gives <b>'+TXT[best.d.to]+'</b>'+(best.d.forbidden?', a forbidden state':'')+'.'
+    : 'No single input, moved on its own, changes this result.';
+  $('tipTable').innerHTML='<thead><tr><th>Input</th><th class="n">Now</th><th class="n">Lower it to</th><th>Result</th><th class="n">Raise it to</th><th>Result</th></tr></thead><tbody>'+
+    tp.rows.map(function(r){ return '<tr><td class="mono">'+r.key+'</td><td class="n">'+r.value.toFixed(2)+'</td>'+cell(r.down)+cell(r.up)+'</tr>'; }).join('')+'</tbody>';
+}
+function renderMini(res){
+  var m=$('mini'); m.hidden = S.tab!=='epoch'; if (m.hidden) return;
+  m.innerHTML='<span>Δ <b>'+fmt(res.delta)+'</b></span><span>next <b>'+TXT[res.next]+'</b> '+M.STATE_LABEL[res.next]+'</span>'+
+    (res.violation&&!res.fallback?'<span style="color:var(--warn)">forbidden</span>':(res.fallback?'<span style="color:var(--warn)">fallback</span>':'<span style="color:var(--ok)">admissible</span>'));
+}
+function setNavH(){ var n=document.querySelector('nav.tabs'); document.documentElement.style.setProperty('--navh', n.offsetHeight+'px'); }
+window.addEventListener('resize',setNavH);
+
+function renderRespAll(){
+  var g=$('respAll'); clear(g); var x0=120, x1=590, W=x1-x0, cols={H:'var(--st-H)',M:'var(--st-M)',G:'var(--st-N)'};
+  M.STATES.forEach(function(s,j){
+    var y=10+j*36, r=M.responsibility(S.presets[s],S.y,S.p), acc=0, cur=s===S.respState;
+    el('text',{x:x0-8,y:y+17,'font-size':12,'text-anchor':'end',fill:'var(--ink)','font-weight':cur?600:400},g,(cur?'▸ ':'')+TXT[s]);
+    if (!r.ok){ el('text',{x:x0,y:y+17,'font-size':11,fill:'var(--warn)'},g,'all contributions are zero'); return; }
+    ['H','M','G'].forEach(function(i){ var w=W*r.rows[i].R;
+      el('rect',{x:x0+acc,y:y,width:Math.max(0,w),height:26,fill:cols[i]},g);
+      if (w>38) el('text',{x:x0+acc+w/2,y:y+17,'font-size':10.5,'text-anchor':'middle',class:'mt',fill:'var(--panel)'},g,(100*r.rows[i].R).toFixed(1)+'%');
+      acc+=w; });
+  });
+  [0,.25,.5,.75,1].forEach(function(v){ el('text',{x:x0+v*W,y:240,'font-size':10.5,'text-anchor':'middle',class:'mt',fill:'var(--muted)'},g,(v*100)+'%'); });
+}
+
+/* ---- scenario replay extras ---- */
+var TX={x:'thetaM',y:'thetaH',s:'S_N',sel:null,grid:null,key:''};
+var TX_R={thetaM:[0,.4,'θM'],thetaH:[0,.4,'θH'],eps:[0,.2,'ε'],rho:[0,1,'ρ'],tau:[0,1,'τ'],kappa:[0,1,'κ']}, TX_G=20;
+(function buildTX(){
+  ['tx-x','tx-y'].forEach(function(id){ var s=$(id); Object.keys(TX_R).forEach(function(k){ var o=document.createElement('option'); o.value=k; o.textContent=TX_R[k][2]; s.appendChild(o); }); });
+  fillStateSelect($('tx-s'));
+  $('tx-x').addEventListener('change',function(){ TX.x=this.value; TX.sel=null; renderScenExtra(); });
+  $('tx-y').addEventListener('change',function(){ TX.y=this.value; TX.sel=null; renderScenExtra(); });
+  $('tx-s').addEventListener('change',function(){ TX.s=this.value; renderScenExtra(); });
+  $('tx-map').addEventListener('click',function(e){ var c=e.target.closest('rect.cell'); if(!c) return; TX.sel=[+c.getAttribute('data-i'),+c.getAttribute('data-j')]; renderScenExtra(); });
+  $('tx-apply').addEventListener('click',function(){ if(!TX.sel) return; S.p[TX.x]=txVal(TX.x,TX.sel[0]); S.p[TX.y]=txVal(TX.y,TX.sel[1]); TX.sel=null; render(); toast('Thresholds applied'); });
+})();
+function txVal(k,i){ var r=TX_R[k]; return +(r[0]+(r[1]-r[0])*i/TX_G).toFixed(4); }
+function renderScenExtra(){
+  // --- stable state by family
+  var fams=[], by={}, used={};
+  SCEN_ACTIVE.forEach(function(sc){ var st=M.replayScenario(sc.x,S.p,S.mode).stable; if(!by[sc.f]){ by[sc.f]={n:0}; fams.push(sc.f); } by[sc.f].n++; by[sc.f][st]=(by[sc.f][st]||0)+1; used[st]=1; });
+  fams.sort(); var g=$('sc-famChart'); clear(g);
+  var rh=Math.max(14,Math.min(21,420/Math.max(1,fams.length))), H=20+fams.length*rh+22, x0=SCEN_CUSTOM?90:250, x1=590, W=x1-x0;
+  g.setAttribute('viewBox','0 0 600 '+H);
+  fams.forEach(function(f,j){
+    var y=8+j*rh, acc=0, lab=(!SCEN_CUSTOM&&SCEN_FAMILIES[f])?f+' · '+SCEN_FAMILIES[f]:String(f); if (lab.length>42) lab=lab.slice(0,41)+'…';
+    el('text',{x:x0-8,y:y+rh*0.68,'font-size':10.5,'text-anchor':'end',fill:'var(--ink)'},g,lab);
+    M.STATES.forEach(function(s){ var n=by[f][s]||0; if(!n) return; var w=W*n/by[f].n;
+      el('rect',{x:x0+acc,y:y,width:w,height:rh-3,fill:SCOL[s]},g);
+      if (w>16) el('text',{x:x0+acc+w/2,y:y+rh*0.66,'font-size':10,'text-anchor':'middle',class:'mt',fill:'var(--panel)'},g,String(n));
+      acc+=w; });
+  });
+  $('sc-famLegend').innerHTML=M.STATES.filter(function(s){return used[s];}).map(function(s){ return '<span><span class="sw" style="background:'+SCOL[s]+'"></span>'+TXT[s]+' '+M.STATE_LABEL[s]+'</span>'; }).join('')+'<span>numbers = scenarios</span>';
+  // --- threshold explorer
+  $('tx-x').value=TX.x; $('tx-y').value=TX.y; $('tx-s').value=TX.s;
+  var m=$('tx-map'); clear(m);
+  if (TX.x===TX.y){ el('text',{x:300,y:190,'font-size':13,'text-anchor':'middle',fill:'var(--muted)'},m,'Choose two different thresholds.'); $('tx-read').textContent=''; $('tx-apply').hidden=true; return; }
+  var key=JSON.stringify(S.p)+S.mode+TX.x+TX.y+SCEN_ACTIVE.length+(SCEN_CUSTOM?'c':'p');
+  if (TX.key!==key){
+    TX.grid=[]; for (var i=0;i<=TX_G;i++){ TX.grid[i]=[]; for (var j=0;j<=TX_G;j++){ var p2=M.clone(S.p); p2[TX.x]=txVal(TX.x,i); p2[TX.y]=txVal(TX.y,j); TX.grid[i][j]=M.scenarioCounts(SCEN_ACTIVE,p2,S.mode); } }
+    TX.key=key; TX.cur=M.scenarioCounts(SCEN_ACTIVE,S.p,S.mode);
+  }
+  var N=SCEN_ACTIVE.length||1, L=64, T=14, Wm=456, Hm=326, cw=Wm/(TX_G+1), ch=Hm/(TX_G+1), same=function(c){ return M.STATES.every(function(s){ return c[s]===TX.cur[s]; }); };
+  for (var a=0;a<=TX_G;a++) for (var b=0;b<=TX_G;b++){
+    var c=TX.grid[a][b], n=c[TX.s], xx=L+a*cw, yy=T+(TX_G-b)*ch;
+    el('rect',{x:xx,y:yy,width:cw-0.6,height:ch-0.6,fill:SCOL[TX.s],'fill-opacity':(0.06+0.94*n/N).toFixed(3),class:'cell','data-i':a,'data-j':b},m);
+    el('text',{x:xx+cw/2,y:yy+ch*0.68,'font-size':8.5,'text-anchor':'middle',class:'mt',fill:n/N>0.55?'var(--panel)':'var(--ink)','pointer-events':'none'},m,String(n));
+    if (same(c)) el('rect',{x:xx+0.7,y:yy+0.7,width:cw-2,height:ch-2,fill:'none',stroke:'var(--ink)','stroke-width':1.1,'pointer-events':'none'},m);
+  }
+  if (TX.sel) el('rect',{x:L+TX.sel[0]*cw-1,y:T+(TX_G-TX.sel[1])*ch-1,width:cw+1.4,height:ch+1.4,fill:'none',stroke:'var(--warn)','stroke-width':2.4,'pointer-events':'none'},m);
+  var rx=TX_R[TX.x], ry=TX_R[TX.y], fx=(S.p[TX.x]-rx[0])/(rx[1]-rx[0]), fy=(S.p[TX.y]-ry[0])/(ry[1]-ry[0]);
+  if (fx>=0&&fx<=1&&fy>=0&&fy<=1) el('circle',{cx:L+(fx*TX_G+0.5)*cw,cy:T+(TX_G-fy*TX_G+0.5)*ch,r:7,fill:'none',stroke:'var(--ink)','stroke-width':2.2,'pointer-events':'none'},m);
+  [0,5,10,15,20].forEach(function(i){
+    el('text',{x:L+(i+0.5)*cw,y:T+Hm+14,'font-size':10.5,'text-anchor':'middle',class:'mt',fill:'var(--muted)'},m,txVal(TX.x,i).toFixed(2));
+    el('text',{x:L-6,y:T+(TX_G-i+0.5)*ch+4,'font-size':10.5,'text-anchor':'end',class:'mt',fill:'var(--muted)'},m,txVal(TX.y,i).toFixed(2));
+  });
+  el('text',{x:L+Wm/2,y:T+Hm+34,'font-size':12,'text-anchor':'middle',fill:'var(--ink)'},m,rx[2]);
+  el('text',{x:14,y:T+Hm/2,'font-size':12,'text-anchor':'middle',fill:'var(--ink)'},m,ry[2]);
+  for (var q=0;q<=10;q++) el('rect',{x:L+Wm+22,y:T+(10-q)*(Hm/11),width:16,height:Hm/11-0.5,fill:SCOL[TX.s],'fill-opacity':(0.06+0.94*q/10).toFixed(3)},m);
+  el('text',{x:L+Wm+44,y:T+10,'font-size':10.5,class:'mt',fill:'var(--muted)'},m,String(N));
+  el('text',{x:L+Wm+44,y:T+Hm,'font-size':10.5,class:'mt',fill:'var(--muted)'},m,'0');
+  if (TX.sel){ var cc=TX.grid[TX.sel[0]][TX.sel[1]];
+    $('tx-read').innerHTML='<span class="mono">'+rx[2]+' = '+txVal(TX.x,TX.sel[0]).toFixed(2)+', '+ry[2]+' = '+txVal(TX.y,TX.sel[1]).toFixed(2)+'</span> → '+M.STATES.filter(function(s){return cc[s];}).map(function(s){ return TXT[s]+' <b>'+cc[s]+'</b>'; }).join(' · ');
+    $('tx-apply').hidden=false; }
+  else { $('tx-read').textContent='Click a cell.'; $('tx-apply').hidden=true; }
+}
+
+/* ---- glossary ---- */
+(function buildGloss(){
+  var G=[['CP<sub>H</sub>, CP<sub>M</sub>','Capability of the human and of the machine for this decision (0 to 1)'],
+    ['TR<sub>H</sub>, TR<sub>M</sub>','Trustworthiness'],['VA<sub>H</sub>, VA<sub>M</sub>','Value alignment of each agent'],['UC<sub>H</sub>, UC<sub>M</sub>','Uncertainty of each agent (higher is worse)'],
+    ['VA<sub>HM</sub>','Joint value alignment of human and machine; compared with τ'],['ER','Ethical risk of the decision; compared with ρ'],['TC','Time criticality; compared with κ'],
+    ['FC','Fairness-critical flag (0 or 1)'],['HO','Human override flag (0 or 1)'],
+    ['S<sub>H</sub>, S<sub>M</sub> (strength)','Situated strength score of each agent: weighted geometric mean of CP, TR, VA and 1 − UC'],['Δ','Strength gap S<sub>M</sub> − S<sub>H</sub>; positive means the machine is stronger'],
+    ['θ<sub>M</sub>, θ<sub>H</sub>','How large the gap must be before the machine, or the human, counts as clearly stronger'],['ε','Half-width of the band in which the strengths count as balanced'],
+    ['ρ, τ, κ','Limits for ethical risk, joint value alignment and time criticality'],['A(x<sub>t</sub>)','Admissible set: the states the constraints allow in the current context'],
+    ['q<sub>t</sub>, q<sub>t+1</sub>','Current authority state and the next one'],
+    ['S_H, S_M','Human-led and machine-led control'],['S_H→M, S_M→H','Logged handover request and return request'],['S_HM','Shared control'],['S_N','Negotiation / recovery'],
+    ['χ','Contribution of a party to the outcome'],['a, k, f, d','Authority, knowledge, freedom and duty of a party'],['ψ','Functional share: a party’s contribution divided by all contributions'],
+    ['y<sub>t</sub>','Assessed success of the joint outcome (0 to 1)'],['r<sup>+</sup>, r<sup>−</sup>, R','Share of the success, share of the blame, and their sum; the R of all parties add to 1'],
+    ['H, M, G','Human, machine and supervisor (governance)']];
+  $('glossTable').innerHTML='<thead><tr><th>Symbol</th><th>Meaning</th></tr></thead><tbody>'+G.map(function(r){ return '<tr><td class="mono">'+r[0]+'</td><td style="white-space:normal">'+r[1]+'</td></tr>'; }).join('')+'</tbody>';
+  var pop=$('glossPop'), btn=$('glossBtn');
+  btn.addEventListener('click',function(e){ e.stopPropagation(); var open=pop.hidden; pop.hidden=!open; btn.setAttribute('aria-expanded',open?'true':'false'); if (open){ $('sharePop').hidden=true; $('shareBtn').setAttribute('aria-expanded','false'); } });
+  $('shareBtn').addEventListener('click',function(){ pop.hidden=true; btn.setAttribute('aria-expanded','false'); });
+  document.addEventListener('click',function(e){ if (!pop.hidden&&!pop.contains(e.target)&&e.target!==btn){ pop.hidden=true; btn.setAttribute('aria-expanded','false'); } });
+  document.addEventListener('keydown',function(e){ if (e.key==='Escape'&&!pop.hidden){ pop.hidden=true; btn.setAttribute('aria-expanded','false'); btn.focus(); } });
+})();
+
+/* ---- report (Markdown) ---- */
+function modeName(m){ return MODES.filter(function(z){ return z[0]===m; })[0][1]; }
+function plain(html){ var d=document.createElement('div'); d.innerHTML=html; return d.textContent; }
+function mdTable(head,rows){ return '| '+head.join(' | ')+' |\n|'+head.map(function(){return '---';}).join('|')+'|\n'+rows.map(function(r){ return '| '+r.join(' | ')+' |'; }).join('\n')+'\n'; }
+function buildReport(){
+  var p=S.p, res=M.step(S.q,S.x,p,S.mode), out=[], L=function(s){ out.push(s); };
+  L('# M-CSM simulator report'); L(''); L('Generated '+new Date().toISOString().slice(0,10)+'. Transition rule: **'+modeName(S.mode)+'**'+(S.mode==='revised'?' (when no rule applies: '+(p.deadBand==='hold'?'hold the current stable state':'go to S_N')+')':'')+'.'); L('');
+  L('## Parameters'); L('');
+  L(mdTable(['θM','θH','ε','ρ','τ','κ'],[[p.thetaM,p.thetaH,p.eps,p.rho,p.tau,p.kappa]]));
+  L(mdTable(['Weights','CP','TR','VA','1−UC'],[['Human'].concat(p.wH),['Machine'].concat(p.wM)]));
+  L('Responsibility exponents: α = ('+p.alpha.join(', ')+'), β = ('+p.beta.join(', ')+').'); L('');
+  L('## Decision epoch'); L('');
+  L(mdTable(ALL_KEYS,[ALL_KEYS.map(function(k){ return S.x[k]; })]));
+  L('Current state '+TXT[S.q]+'. Human strength '+res.SH.toFixed(3)+', machine strength '+res.SM.toFixed(3)+', Δ = '+fmt(res.delta)+'.'); L('');
+  L('Admissible states: '+res.A.set.map(function(s){return TXT[s];}).join(', ')+'.'); L('');
+  L('**Next state: '+TXT[res.next]+' ('+M.STATE_LABEL[res.next]+')** — '+plain(ruleReason(S.mode,res))+(res.violation&&!res.fallback?'. This state is forbidden by the constraints.':'.')); L('');
+  var tp=M.tippingPoints(S.q,S.x,p,S.mode), tc=function(d){ return d?d.at.toFixed(3)+' → '+TXT[d.to]+(d.forbidden?' (forbidden)':''):'—'; };
+  L('### Tipping points'); L(''); L(mdTable(['Input','Now','Lower it to','Raise it to'],tp.rows.map(function(r){ return [r.key,r.value.toFixed(2),tc(r.down),tc(r.up)]; })));
+  var ro=M.rollout(S.q,S.x,p,S.mode,20);
+  L('### Stabilised rollout'); L(''); L(TXT[S.q]+' → '+ro.trace.map(function(r){return TXT[r.next];}).join(' → ')+(ro.stable?' (stable)':ro.cycle?' (cycle)':' (not settled)')+'.'); L('');
+  var rs=S.respFollow?res.next:S.respState, rr=M.responsibility(S.presets[rs],S.y,p);
+  L('## Responsibility'); L(''); L('Regime '+TXT[rs]+', y = '+S.y+'.'); L('');
+  if (rr.ok) L(mdTable(['Party','ψ','r+','r−','R'],['H','M','G'].map(function(i){ var w=rr.rows[i]; return [PARTY[i],w.psi.toFixed(3),w.rp.toFixed(3),w.rm.toFixed(3),w.R.toFixed(3)]; })));
+  else L('All contributions are zero, so the shares are undefined.');
+  L('## Scenario replay ('+(SCEN_CUSTOM?SCEN_ACTIVE.length+' imported scenarios':'100 validation scenarios')+')'); L('');
+  var st=['S_H','S_HM','S_N','S_M','S_HtoM','S_MtoH'];
+  L(mdTable(['Rule'].concat(st.map(function(s){return TXT[s];})),MODES.map(function(m){ var c=M.scenarioCounts(SCEN_ACTIVE,p,m[0]); return [m[1]].concat(st.map(function(s){return c[s];})); }).concat(SCEN_CUSTOM?[]:[['Paper',26,45,28,1,0,0]])));
+  L('## Scenario builder story'); L('');
+  L((STORY_PRESETS[BUILD.preset]?STORY_PRESETS[BUILD.preset].name:'Custom story')+': '+BUILD.T+' epochs from '+TXT[BUILD.q0]+'.'); L('');
+  if (BUILD.events.length) L(mdTable(['Epoch','Input','New value','Ramp'],BUILD.events.map(function(e){ return [e.t,e.key,e.v,e.r]; })));
+  L(mdTable(['Rule','Sequence of states','Forbidden'],MODES.map(function(m){ var rows=M.runStory(BUILD.base,BUILD.events,BUILD.T,BUILD.q0,p,m[0]).rows, seq=[], last=null, v=0;
+    rows.forEach(function(r){ if (r.violation&&!r.fallback) v++; if (r.next!==last){ seq.push(TXT[r.next]+'@'+r.t); last=r.next; } }); return [m[1],seq.join(' → '),v]; })));
+  var R=CMP.res;
+  L('## Rule comparison'); L('');
+  if (!R) L('Not run in this session.');
+  else {
+    L(R.N.toLocaleString('en')+' random contexts, seed '+R.seed+', '+(R.q==='random'?'random current state':'current state '+TXT[R.q])+', P(HO = 1) = '+R.pHO+', P(FC = 1) = '+R.pFC+(R.sig!==JSON.stringify(p)?'. Note: parameters have changed since this run.':'.')); L('');
+    L(mdTable(['Rule','Forbidden results','95 % CI'],MODES.map(function(m){ var ci=M.wilson(R.viol[m[0]],R.N); return [m[1],pct(R.viol[m[0]],R.N,2),(100*ci[0]).toFixed(2)+'–'+(100*ci[1]).toFixed(2)+' %']; })));
+    L(mdTable(['Disagreement'].concat(MODES.map(function(m){return m[1];})),MODES.map(function(m,a){ return [m[1]].concat(MODES.map(function(n,b){ return a===b?'—':pct(R.dis[Math.min(a,b)+'-'+Math.max(a,b)]||0,R.N); })); })));
+  }
+  return out.join('\n');
+}
+$('reportBtn').addEventListener('click',function(){ saveFile('mcsm-report.md',buildReport(),'text/markdown'); });
+
+/* ---- autosave and reset ---- */
+var SAVE_KEY='mcsm-settings-v1', DEFAULT_SETTINGS=null, saveTimer=null;
+function scheduleSave(){ clearTimeout(saveTimer); saveTimer=setTimeout(function(){ try{ localStorage.setItem(SAVE_KEY,JSON.stringify(settingsObj())); }catch(e){} },500); }
+function loadSaved(){ try{ var t=localStorage.getItem(SAVE_KEY); if (!t) return null; return applySettings(JSON.parse(t)); }catch(e){ return null; } }
+$('resetAll').addEventListener('click',function(){
+  try{ localStorage.removeItem(SAVE_KEY); }catch(e){}
+  stopPlay(); applySettings(JSON.parse(JSON.stringify(DEFAULT_SETTINGS)));
+  S.loaded=null; S.log=[]; CMP.res=null; CMP.samples=null; $('c-status').textContent=''; TX.sel=null;
+  if (SCEN_CUSTOM) $('sc-reset').click();
+  $('sharePop').hidden=true; $('shareBtn').setAttribute('aria-expanded','false');
+  showTab('epoch'); toast('Everything reset to the defaults');
+});
 
 function render(fromParamInput){
   syncers.forEach(function(s){ s.sync(); });
@@ -2209,6 +2573,7 @@ function render(fromParamInput){
   if (S.tab==='scen') renderScen();
   if (S.tab==='land') renderLand();
   if (S.tab==='par') renderPar(fromParamInput===true);
+  renderMini(res); scheduleSave();
   if (S.tab==='build') renderBuild();
   if (S.tab==='cmp') renderCmp();
   fillAllRanges();
@@ -2216,10 +2581,12 @@ function render(fromParamInput){
 var startTab='epoch';
 try{ var st=localStorage.getItem('mcsm-tab'); if (st && TABS.indexOf(st)>=0) startTab=st; }catch(e){}
 var hash=(location.hash||'').replace('#',''); if (TABS.indexOf(hash)>=0) startTab=hash;
-var hashTab=settingsFromHash(); if (hashTab) startTab=hashTab;
+DEFAULT_SETTINGS=JSON.parse(JSON.stringify(settingsObj()));
+var hashTab=/[#&]s=/.test(location.hash||'')?settingsFromHash():loadSaved(); if (hashTab) startTab=hashTab;
 addExportBars();
 showTab(startTab);
 sizeModeNote();
+setNavH();
 })();
 </script>
 </body>
