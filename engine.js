@@ -1,4 +1,4 @@
-/* M-CSM reference engine — implements eqs. (2)–(12) and Algorithm 1 of
+/* M-CSM reference engine — implements eqs. (2)–(12) and the transition rules of
    "M-CSM: A Governance-Oriented Complementary Strength Model for Hybrid
    Human–Machine Decision-Making". Pure functions, no DOM. */
 var MCSM = (function () {
@@ -272,12 +272,140 @@ var MCSM = (function () {
     return { rows: rows, transfers: transfers, untraced: untraced, violations: violations, zeroChi: Object.keys(zeroStates) };
   }
 
+
+  /* ------------------------------------------------------------------
+     Reproducible experiments (used by the simulator tabs and by Node)
+     ------------------------------------------------------------------ */
+  var INPUT_KEYS = CONT_INPUTS.concat(['FC', 'HO']);
+  var MODES = ['literal', 'enforced', 'eq8', 'revised'];
+
+  // Seeded pseudo-random generator (mulberry32): same seed, same sequence everywhere
+  function rng(seed) {
+    var a = seed | 0;
+    return function () {
+      a |= 0; a = a + 0x6D2B79F5 | 0;
+      var t = Math.imul(a ^ a >>> 15, 1 | a);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+
+  /* Monte Carlo comparison of the four transition rules.
+     o: {N, seed, q:'random'|state, pHO, pFC, p}
+     Each context: the 11 continuous inputs uniform on [0,1], FC ~ Bernoulli(pFC),
+     HO ~ Bernoulli(pHO), and (if q is 'random') the current state uniform over the six states.
+     compareInit + compareStep allow the work to be done in chunks; compareRules does it in one call. */
+  function compareInit(o) {
+    var R = { N: o.N, seed: o.seed, q: o.q || 'random', pHO: o.pHO, pFC: o.pFC, p: clone(o.p), i: 0,
+              next: {}, viol: {}, byC: {}, stable: {}, dis: {}, pairs: {}, rnd: rng(o.seed) };
+    MODES.forEach(function (m) {
+      R.next[m] = {}; R.viol[m] = 0; R.byC[m] = { '(4)': 0, '(5)': 0, '(6)': 0, '(7)': 0 }; R.stable[m] = {};
+    });
+    return R;
+  }
+  function compareStep(R, count, onSample) {
+    var end = Math.min(R.N, R.i + count), rnd = R.rnd, p = R.p;
+    for (; R.i < end; R.i++) {
+      var x = {}, k;
+      for (k = 0; k < 11; k++) x[CONT_INPUTS[k]] = rnd();
+      x.FC = rnd() < R.pFC ? 1 : 0; x.HO = rnd() < R.pHO ? 1 : 0;
+      var q = R.q === 'random' ? STATES[Math.floor(rnd() * 6)] : R.q;
+      var d = scores(x, p).delta, nx = [], vi = [], chosen = [];
+      for (var j = 0; j < 4; j++) {
+        var m = MODES[j], r = decide(q, d, x, p, m);
+        // for 'enforced', r.violation describes the published choice before it is replaced by S_H
+        chosen.push(m === 'enforced' ? chosen[0] : r.next);
+        R.next[m][r.next] = (R.next[m][r.next] || 0) + 1;
+        if (r.violation) {
+          R.viol[m]++;
+          var why = r.A.excluded[chosen[j]] || [], seen = {};
+          for (var w = 0; w < why.length; w++) { var c = why[w].slice(0, 3); if (!seen[c]) { seen[c] = 1; R.byC[m][c]++; } }
+        }
+        nx.push(r.next); vi.push(r.violation);
+        var ro = rollout(q, x, p, m, 20), key = ro.stable ? ro.final : (ro.cycle ? 'cycle' : 'none');
+        R.stable[m][key] = (R.stable[m][key] || 0) + 1;
+      }
+      for (var a = 0; a < 4; a++) for (var b = a + 1; b < 4; b++) if (nx[a] !== nx[b]) { var kk = a + '-' + b; R.dis[kk] = (R.dis[kk] || 0) + 1; }
+      if (nx[0] !== nx[3]) { var pk = q + '|' + nx[0] + '|' + nx[3]; R.pairs[pk] = (R.pairs[pk] || 0) + 1; }
+      if (onSample) onSample({ q: q, x: x, next: nx, viol: vi });
+    }
+    return R.i >= R.N;
+  }
+  function compareRules(o) { var R = compareInit(o); compareStep(R, R.N, o.onSample); return R; }
+
+  // 95 % Wilson confidence interval for a proportion k/n
+  function wilson(k, n) {
+    if (!n) return [0, 0];
+    var z = 1.959964, ph = k / n, den = 1 + z * z / n, mid = (ph + z * z / (2 * n)) / den;
+    var half = z * Math.sqrt(ph * (1 - ph) / n + z * z / (4 * n * n)) / den;
+    return [Math.max(0, mid - half), Math.min(1, mid + half)];
+  }
+
+  /* Scripted story: base context plus changes [{t, key, v, r}] over T epochs.
+     From epoch t the input moves to v, at once (r = 0) or linearly over r epochs. */
+  function storyInputs(base, events, T) {
+    var xs = [], ser = {}, t;
+    INPUT_KEYS.forEach(function (k) { ser[k] = []; for (var u = 0; u < T; u++) ser[k][u] = base[k]; });
+    events.slice().sort(function (a, b) { return a.t - b.t; }).forEach(function (e) {
+      var k = e.key; if (!ser[k]) return;
+      var bin = (k === 'FC' || k === 'HO'), t0 = Math.max(0, Math.min(T - 1, Math.round(e.t)));
+      var from = t0 > 0 ? ser[k][t0 - 1] : base[k], r = bin ? 0 : Math.max(0, Math.round(e.r || 0));
+      var v = bin ? (e.v >= 0.5 ? 1 : 0) : clip01(+e.v);
+      for (var u = t0; u < T; u++) ser[k][u] = (r > 0 && u < t0 + r) ? from + (v - from) * (u - t0 + 1) / r : v;
+    });
+    for (t = 0; t < T; t++) { var x = {}; INPUT_KEYS.forEach(function (k) { x[k] = ser[k][t]; }); xs.push(x); }
+    return { xs: xs, ser: ser };
+  }
+  function runStory(base, events, T, q0, p, mode) {
+    var si = storyInputs(base, events, T), q = q0, rows = [];
+    si.xs.forEach(function (x, t) { var r = step(q, x, p, mode); r.t = t; rows.push(r); q = r.next; });
+    return { rows: rows, inputs: si };
+  }
+
+  /* Tipping points: for each continuous input, the nearest value below and above the
+     current one at which the next state changes (all other inputs held fixed). */
+  function tippingPoints(q, x, p, mode) {
+    function sig(r) { return r.next + (r.violation && !r.fallback ? '!' : ''); }
+    function at(k, v) { var x2 = clone(x); x2[k] = v; return step(q, x2, p, mode); }
+    var b0 = step(q, x, p, mode), base = sig(b0);
+    function find(k, dir) {
+      var v0 = x[k], prev = v0, v = v0;
+      while (true) {
+        v = dir > 0 ? Math.min(1, prev + 0.01) : Math.max(0, prev - 0.01);
+        if (v === prev) return null;
+        if (sig(at(k, v)) !== base) {
+          var lo = prev, hi = v; // lo keeps the current result, hi does not
+          for (var i = 0; i < 20; i++) { var mid = (lo + hi) / 2; if (sig(at(k, mid)) === base) lo = mid; else hi = mid; }
+          var r = at(k, hi);
+          return { at: hi, to: r.next, forbidden: r.violation && !r.fallback, change: hi - v0 };
+        }
+        prev = v;
+      }
+    }
+    return { base: b0.next, forbidden: b0.violation && !b0.fallback,
+             rows: CONT_INPUTS.map(function (k) { return { key: k, value: x[k], down: find(k, -1), up: find(k, 1) }; }) };
+  }
+
+  /* Scenario replay as in the validation notebook: start in S_H, repeat for up to four epochs. */
+  function replayScenario(x, p, mode) {
+    var q = 'S_H', first = null, viol = false;
+    for (var k = 0; k < 4; k++) { var r = step(q, x, p, mode); if (first === null) first = r; if (r.violation) viol = true; if (r.next === q) break; q = r.next; }
+    return { one: first, stable: q, viol: viol };
+  }
+  function scenarioCounts(list, p, mode) {
+    var c = {}; STATES.forEach(function (s) { c[s] = 0; });
+    list.forEach(function (sc) { c[replayScenario(sc.x, p, mode).stable]++; });
+    return c;
+  }
+
   return {
     STATES: STATES, STATE_LABEL: STATE_LABEL, HOLDER: HOLDER, DEFAULT_PARAMS: DEFAULT_PARAMS,
     RESP_PRESETS: RESP_PRESETS, CONT_INPUTS: CONT_INPUTS,
     strength: strength, scores: scores, admissible: admissible, step: step, decide: decide, transitionMap: transitionMap, rollout: rollout,
     responsibility: responsibility, sensitivity: sensitivity, perturbRun: perturbRun,
-    normWeights: normWeights, clone: clone, clip01: clip01
+    normWeights: normWeights, clone: clone, clip01: clip01,
+    INPUT_KEYS: INPUT_KEYS, MODES: MODES, rng: rng, compareInit: compareInit, compareStep: compareStep, compareRules: compareRules, wilson: wilson,
+    storyInputs: storyInputs, runStory: runStory, tippingPoints: tippingPoints, replayScenario: replayScenario, scenarioCounts: scenarioCounts
   };
 })();
 if (typeof module !== 'undefined') module.exports = MCSM;
