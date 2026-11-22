@@ -16,6 +16,11 @@ var MCSM = (function () {
     wH: [0.35, 0.20, 0.25, 0.20],
     wM: [0.40, 0.20, 0.20, 0.20],
     thetaM: 0.12, thetaH: 0.10, eps: 0.05, rho: 0.70, tau: 0.60, kappa: 0.80, deadBand: 'negotiate',
+    // Time-pressure extension (rule 'time'), eqs. (13)–(15) of the time-pressure draft
+    gammaH: 0.50,   // loss of human capability at full time pressure
+    gammaM: 0.00,   // loss of machine capability at full time pressure
+    eta: 0.50,      // share of the indecision band (between ε and θ) removed at full time pressure
+    lambdaF: 0.50,  // loss of human freedom to deliberate at full time pressure (responsibility)
     alpha: [1, 1, 1],            // (αa, αk, αd)
     beta: [1.3, 1.2, 0.8, 1.1]   // (βa, βk, βf, βd)
   };
@@ -58,6 +63,25 @@ var MCSM = (function () {
     return { SH: SH, SM: SM, delta: SM - SH };
   }
 
+  /* Time-pressure extension. TC(t) in [0,1] is read as graded time pressure:
+       CP_H,eff = CP_H (1 - γ_H TC),  CP_M,eff = CP_M (1 - γ_M TC)                (13)
+       θ_X(t)   = ε + (θ_X - ε)(1 - η TC)  for X in {M, H}                       (14)
+       f_H,eff  = f_H (1 - λ TC)   in the responsibility factors                  (15)
+     Constraint (7) still excludes S_N, S_H→M and S_M→H when TC ≥ κ. */
+  function num(v, d) { return (typeof v === 'number' && isFinite(v)) ? v : d; }
+  function timeAdjust(x, p) {
+    var tc = clip01(x.TC), xs = {}, pp = {}, k;
+    for (k in x) xs[k] = x[k];
+    for (k in p) pp[k] = p[k];
+    var gH = clip01(num(p.gammaH, 0.5)), gM = clip01(num(p.gammaM, 0)), eta = clip01(num(p.eta, 0.5));
+    xs.CP_H = x.CP_H * (1 - gH * tc);
+    xs.CP_M = x.CP_M * (1 - gM * tc);
+    var f = 1 - eta * tc;
+    if (p.thetaM > p.eps) pp.thetaM = p.eps + (p.thetaM - p.eps) * f;
+    if (p.thetaH > p.eps) pp.thetaH = p.eps + (p.thetaH - p.eps) * f;
+    return { x: xs, p: pp, tc: tc };
+  }
+
   function decide(q, d, x, p, mode, opts) {
     opts = opts || {};
     var A = admissible(x, p), next, line;
@@ -91,6 +115,22 @@ var MCSM = (function () {
           else { next = 'S_H'; line = 16; }
         }
       }
+    } else if (mode === 'time') {
+      /* Time-aware rule: the published rule with time-adjusted strengths and thresholds
+         (applied in step()), plus the cases where constraint (7) excludes the logged
+         transfer states or negotiation: transfer directly, or fall back to S_H. */
+      if (x.HO === 1 || x.ER >= p.rho || x.FC === 1) { next = 'S_H'; line = 3; }
+      else if (q === 'S_H' && d >= p.thetaM && A.has('S_M')) {
+        if (!opts.collapse && A.has('S_HtoM')) { next = 'S_HtoM'; line = 5; } else { next = 'S_M'; line = 'T6'; }
+      }
+      else if ((q === 'S_M' || q === 'S_HtoM') && d >= p.thetaM && A.has('S_M')) { next = 'S_M'; line = 7; }
+      else if (q === 'S_M' && d <= -p.thetaH) {
+        if (!opts.collapse && A.has('S_MtoH')) { next = 'S_MtoH'; line = 9; } else { next = 'S_H'; line = 'T10'; }
+      }
+      else if ((q === 'S_H' || q === 'S_MtoH') && d <= -p.thetaH) { next = 'S_H'; line = 11; }
+      else if (Math.abs(d) < p.eps && x.VA_HM >= p.tau && A.has('S_HM')) { next = 'S_HM'; line = 13; }
+      else if (A.has('S_N')) { next = 'S_N'; line = 15; }
+      else { next = 'S_H'; line = 'T16'; }
     } else {
       if (x.HO === 1 || x.ER >= p.rho || x.FC === 1) { next = 'S_H'; line = 3; }
       else if (q === 'S_H' && d >= p.thetaM && A.has('S_M')) { next = opts.collapse ? 'S_M' : 'S_HtoM'; line = 5; }
@@ -110,16 +150,22 @@ var MCSM = (function () {
      mode: 'literal'  – Published: Algorithm 1 exactly as printed
            'enforced' – Human fallback: an inadmissible result becomes S_H
            'eq8'      – Compact (eq. 8): the stateless summary policy
+           'revised'  – Admissibility-preserving rule
+           'time'     – Time-aware: published rule with the time-pressure extension
      opts.collapse: true skips the logged handover states (S_H→M, S_M→H) */
   function step(q, x, p, mode, opts) {
-    var sc = scores(x, p);
-    var r = decide(q, sc.delta, x, p, mode, opts);
+    var xs = x, pp = p, ta = null;
+    if (mode === 'time') { ta = timeAdjust(x, p); xs = ta.x; pp = ta.p; }
+    var sc = scores(xs, p);
+    var r = decide(q, sc.delta, x, pp, mode, opts);
     r.SH = sc.SH; r.SM = sc.SM;
+    if (ta) { r.time = { tc: ta.tc, CP_H: xs.CP_H, CP_M: xs.CP_M, thetaM: pp.thetaM, thetaH: pp.thetaH }; }
     return r;
   }
 
   /* Next state for every (q_t, region of Δ) under the governance signals of x. */
   function transitionMap(x, p, mode) {
+    if (mode === 'time') p = timeAdjust(x, p).p;
     var regions = [];
     regions.push({ key: 'hadv', label: 'Δ ≤ −θH', d: -p.thetaH - 0.05 });
     if (p.thetaH > p.eps) regions.push({ key: 'deadm', label: '−θH < Δ ≤ −ε', d: -(p.thetaH + p.eps) / 2 });
@@ -176,6 +222,16 @@ var MCSM = (function () {
     });
     out.total = total;
     return out;
+  }
+
+  /* Responsibility under a given rule: with the time-aware rule the human's freedom
+     to deliberate is reduced by time pressure, eq. (15). */
+  function respFor(parties, y, p, mode, x) {
+    if (mode !== 'time' || !x) return responsibility(parties, y, p);
+    var lam = clip01(num(p.lambdaF, 0.5)), tc = clip01(x.TC), P = {};
+    ['H', 'M', 'G'].forEach(function (i) { P[i] = {}; for (var k in parties[i]) P[i][k] = parties[i][k]; });
+    P.H.f = parties.H.f * (1 - lam * tc);
+    return responsibility(P, y, p);
   }
 
   /* Illustrative responsibility presets per regime. NOT from the paper:
@@ -258,7 +314,7 @@ var MCSM = (function () {
       var zeroChi = !(chiSum > 0);
       var psiH = zeroChi ? NaN : actual.H.chi / chiSum, psiM = zeroChi ? NaN : actual.M.chi / chiSum, psiG = zeroChi ? NaN : actual.G.chi / chiSum;
       var y = zeroChi ? NaN : clip01(psiH * trueCPH + psiM * trueCPM + psiG * (trueCPH + trueCPM) / 2);
-      var resp = zeroChi ? null : responsibility(parties, y, p);
+      var resp = zeroChi ? null : respFor(parties, y, p, cfg.mode, x);
       if (zeroChi) zeroStates[r.next] = 1;
       rows.push({
         t: t, q: q, next: r.next, recorded: recState, line: r.line, delta: r.delta, SH: r.SH, SM: r.SM,
@@ -277,7 +333,7 @@ var MCSM = (function () {
      Reproducible experiments (used by the simulator tabs and by Node)
      ------------------------------------------------------------------ */
   var INPUT_KEYS = CONT_INPUTS.concat(['FC', 'HO']);
-  var MODES = ['literal', 'enforced', 'eq8', 'revised'];
+  var MODES = ['literal', 'enforced', 'eq8', 'revised', 'time'];
 
   // Seeded pseudo-random generator (mulberry32): same seed, same sequence everywhere
   function rng(seed) {
@@ -311,8 +367,8 @@ var MCSM = (function () {
       x.FC = rnd() < R.pFC ? 1 : 0; x.HO = rnd() < R.pHO ? 1 : 0;
       var q = R.q === 'random' ? STATES[Math.floor(rnd() * 6)] : R.q;
       var d = scores(x, p).delta, nx = [], vi = [], chosen = [];
-      for (var j = 0; j < 4; j++) {
-        var m = MODES[j], r = decide(q, d, x, p, m);
+      for (var j = 0; j < MODES.length; j++) {
+        var m = MODES[j], r = m === 'time' ? step(q, x, p, m) : decide(q, d, x, p, m);
         // for 'enforced', r.violation describes the published choice before it is replaced by S_H
         chosen.push(m === 'enforced' ? chosen[0] : r.next);
         R.next[m][r.next] = (R.next[m][r.next] || 0) + 1;
@@ -325,7 +381,7 @@ var MCSM = (function () {
         var ro = rollout(q, x, p, m, 20), key = ro.stable ? ro.final : (ro.cycle ? 'cycle' : 'none');
         R.stable[m][key] = (R.stable[m][key] || 0) + 1;
       }
-      for (var a = 0; a < 4; a++) for (var b = a + 1; b < 4; b++) if (nx[a] !== nx[b]) { var kk = a + '-' + b; R.dis[kk] = (R.dis[kk] || 0) + 1; }
+      for (var a = 0; a < MODES.length; a++) for (var b = a + 1; b < MODES.length; b++) if (nx[a] !== nx[b]) { var kk = a + '-' + b; R.dis[kk] = (R.dis[kk] || 0) + 1; }
       if (nx[0] !== nx[3]) { var pk = q + '|' + nx[0] + '|' + nx[3]; R.pairs[pk] = (R.pairs[pk] || 0) + 1; }
       if (onSample) onSample({ q: q, x: x, next: nx, viol: vi });
     }
@@ -402,7 +458,7 @@ var MCSM = (function () {
     STATES: STATES, STATE_LABEL: STATE_LABEL, HOLDER: HOLDER, DEFAULT_PARAMS: DEFAULT_PARAMS,
     RESP_PRESETS: RESP_PRESETS, CONT_INPUTS: CONT_INPUTS,
     strength: strength, scores: scores, admissible: admissible, step: step, decide: decide, transitionMap: transitionMap, rollout: rollout,
-    responsibility: responsibility, sensitivity: sensitivity, perturbRun: perturbRun,
+    responsibility: responsibility, respFor: respFor, timeAdjust: timeAdjust, sensitivity: sensitivity, perturbRun: perturbRun,
     normWeights: normWeights, clone: clone, clip01: clip01,
     INPUT_KEYS: INPUT_KEYS, MODES: MODES, rng: rng, compareInit: compareInit, compareStep: compareStep, compareRules: compareRules, wilson: wilson,
     storyInputs: storyInputs, runStory: runStory, tippingPoints: tippingPoints, replayScenario: replayScenario, scenarioCounts: scenarioCounts

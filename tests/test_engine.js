@@ -83,4 +83,41 @@ ok('tipping points mark where the result changes (ER at ρ, TC at κ becomes for
 assert.deepStrictEqual(M.scenarioCounts(scenarios, p, 'literal'), { S_H: 26, S_HtoM: 0, S_M: 1, S_MtoH: 0, S_HM: 45, S_N: 28 });
 ok('scenario counts helper gives 26 / 45 / 28 / 1');
 
+// 9. Time-pressure extension
+{
+  const zero = { ...p, gammaH: 0, gammaM: 0, eta: 0, lambdaF: 0 }, rnd = M.rng(7);
+  let same = 0, n = 0, govSame = 0, govN = 0;
+  for (let i = 0; i < 50000; i++) {
+    const xx = {}; M.CONT_INPUTS.forEach(k => { xx[k] = rnd(); }); xx.FC = rnd() < 0.1 ? 1 : 0; xx.HO = rnd() < 0.1 ? 1 : 0;
+    const q = M.STATES[Math.floor(rnd() * 6)];
+    const pub = M.step(q, xx, p, 'literal'), tz = M.step(q, xx, zero, 'time'), tr = M.step(q, xx, p, 'time');
+    assert(!tr.violation, 'time-aware rule returned a forbidden state');
+    if (!pub.violation) { n++; if (tz.next === pub.next) same++; }
+    if (xx.HO === 1 || xx.ER >= p.rho || xx.FC === 1) { govN++; if (tr.next === 'S_H' && pub.next === 'S_H') govSame++; }
+  }
+  assert.strictEqual(same, n); assert.strictEqual(govSame, govN);
+  const ta = M.timeAdjust({ ...x, TC: 1 }, { ...p, eta: 1 }), t0 = M.timeAdjust({ ...x, TC: 0 }, p);
+  assert(Math.abs(ta.p.thetaM - p.eps) < 1e-12 && Math.abs(ta.p.thetaH - p.eps) < 1e-12);
+  assert.strictEqual(t0.p.thetaM, p.thetaM); assert.strictEqual(t0.x.CP_H, x.CP_H);
+  assert(Math.abs(M.timeAdjust({ ...x, TC: 0.4 }, p).x.CP_H - x.CP_H * 0.8) < 1e-12);
+  const r0 = M.respFor(scenarios[0].P, scenarios[0].y, p, 'time', { ...scenarios[0].x, TC: 0 });
+  const r1 = M.respFor(scenarios[0].P, scenarios[0].y, p, 'literal', scenarios[0].x);
+  assert(Math.abs(r0.rows.H.R - r1.rows.H.R) < 1e-12);
+  ok('time-aware rule: never forbidden; equals the published rule with parameters 0; governance precedes time pressure');
+}
+
+// 10. Time-pressure figures quoted in the paper draft
+{
+  const TP = require('../tools/time_pressure.js').run();
+  const s = o => [o.stable.S_H, o.stable.S_HM, o.stable.S_N, o.stable.S_M].join('/');
+  assert.strictEqual(s(TP.time), '25/41/31/3'); assert.deepStrictEqual(TP.time.R, [62.7, 23.6, 13.7]);
+  assert.strictEqual(s(TP.timeZero), '26/45/28/1');
+  const st = Object.fromEntries(TP.stress.map(r => [r.tc, r]));
+  assert.strictEqual(s(st[1].time), '25/9/0/66'); assert.strictEqual(s(st[0.8].time), '38/19/0/43');
+  assert.strictEqual(st[0.8].published.viol, 29); assert.strictEqual(st[0.8].time.viol, 0);
+  assert.strictEqual((100 * TP.mc.viol.time / TP.mc.N).toFixed(2), '0.00');
+  assert.strictEqual((100 * TP.mc.dis['0-4'] / TP.mc.N).toFixed(2), '12.48');
+  ok('time-pressure figures: 25/41/31/3 on the corpus; 66 machine-led at full pressure; 29 forbidden for the published rule at TC = 0.8');
+}
+
 console.log(`\n${pass} checks passed.`);
