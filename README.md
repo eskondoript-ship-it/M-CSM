@@ -17,19 +17,20 @@ To publish it as a web page, enable **GitHub Pages** for this repository (Settin
 | Rollout & log | Repeat the decision under a fixed context until the state is stable; step through epochs and copy the log as CSV; transition map of every state and Δ region |
 | Responsibility | Success and blame shares for human, machine and supervisor, with conservation check, and a chart comparing the shares across all six regimes |
 | Scenario replay | The 100-scenario validation set, replayed live under any rule and threshold setting; download the set as CSV, edit or add rows, and import it back; a chart of stable states by family; a **threshold explorer** heatmap showing how the counts change with any two thresholds |
-| Scenario builder | Script how inputs change over time (steps or ramps), play the story epoch by epoch, and see the state chosen by all four rules side by side; stories import and export as CSV |
-| Rule comparison | Monte Carlo test of the four rules on up to 200,000 random contexts with a fixed seed: forbidden results by constraint with 95 % confidence intervals, disagreement between rules, where repeated epochs settle, and the most common disagreements |
+| Scenario builder | Script how inputs change over time (steps or ramps), play the story epoch by epoch, and see the state chosen by all five rules side by side; stories import and export as CSV |
+| Rule comparison | Monte Carlo test of the five rules on up to 200,000 random contexts with a fixed seed: forbidden results by constraint with 95 % confidence intervals, disagreement between rules, where repeated epochs settle, and the most common disagreements |
 | Responsibility drift | Perturbation test: silent machine accuracy drop or latency spike, with and without logged handovers |
 | Parameters | All weights, thresholds and exponents, plus the model notes |
 
 The page has a 3D look and is animated: raised panels and keys and bevelled chart shapes; the charts themselves are flat and still. Sliders are coloured from the start to the knob. Sections fly in when opened, the next-state card flips when the state changes, and the strength landscape grows and slowly spins (pause button provided). Animations are turned off when the system asks for reduced motion. The section tabs stay at the top while you scroll (on phones they form one row you can swipe, and the current result stays visible under them while you move the sliders).
 
-Four transition rules can be compared:
+Five transition rules can be compared:
 
 - **Published**: the transition rule exactly as published; a result the constraints forbid is shown with a warning.
 - **Human fallback**: the published rule, with any forbidden result replaced by human-led control.
 - **Compact**: the stateless summary rule.
 - **Admissibility-preserving**: the proposed revised rule. It never selects a forbidden state, lets negotiation and shared control be left when one agent is clearly stronger, and reverses interrupted handovers.
+- **Time-aware**: the published rule with the time-pressure extension. Time criticality TC is read as graded time pressure: it lowers human capability (γ_H) and, optionally, machine capability (γ_M) before the strength scores are computed; it narrows the band between ε and θ in which no allocation rule applies (η); and it lowers the human's freedom in the blame shares (λ). When TC ≥ κ the logged transfer states and negotiation are excluded, so the rule transfers directly and sends unresolved cases to human-led control. The safety override (HO, ER, FC) always comes first. With all four parameters at 0 it gives the published results.
 
 ## Export and sharing
 
@@ -47,6 +48,7 @@ Four transition rules can be compared:
 | `data/scenarios.json` | Inputs and notebook results for the 100 validation scenarios (20 families × 5) |
 | `tests/test_engine.js` | Checks the model against the equations, the 100-scenario results and the quoted Monte Carlo figures |
 | `tools/reproduce.js` | Prints the scenario counts and the rule-comparison figures from the command line |
+| `tools/time_pressure.js` | Prints every figure reported for the time-pressure extension |
 
 ## Run the tests
 
@@ -62,6 +64,12 @@ To print the key numbers yourself:
 
 ```
 node tools/reproduce.js
+```
+
+To print every number reported for the time-pressure extension (corpus counts, sensitivity grid, stress test at fixed time pressure, rule comparison):
+
+```
+node tools/time_pressure.js
 ```
 
 ## Notes

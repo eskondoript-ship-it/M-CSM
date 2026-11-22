@@ -4,7 +4,7 @@ const M = require('../engine.js');
 const { scenarios } = require('../data/scenarios.json');
 const N = +process.argv[2] || 200000, seed = process.argv[3] !== undefined ? +process.argv[3] : 2026;
 const p = M.clone(M.DEFAULT_PARAMS);
-const NAME = { literal: 'Published', enforced: 'Human fallback', eq8: 'Compact', revised: 'Admissibility-preserving' };
+const NAME = { literal: 'Published', enforced: 'Human fallback', eq8: 'Compact', revised: 'Admissibility-preserving', time: 'Time-aware' };
 const pct = (k, n) => (100 * k / n).toFixed(2) + ' %';
 
 console.log('M-CSM: 100-scenario replay (stable states)');
